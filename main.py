@@ -7,6 +7,18 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
 
+def get_ffmpeg_path():
+    fmpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg.exe")
+    if os.path.isfile(fmpath):
+        return fmpath
+
+    for p in os.environ["PATH"].split(";"):
+        fmpath = os.path.join(p, "ffmpeg.exe")
+        if os.path.isfile(fmpath):
+            return fmpath
+    return ""
+
+
 def get_text_wav(filePath, model):
     # 音声ファイルの読み込み
     print(filePath)
@@ -30,10 +42,10 @@ def get_text_wav(filePath, model):
     return result
 
 
-def convert_mp3_to_wav(fullname, name, output_folder_path):
+def convert_mp3_to_wav(fullname, name, output_folder_path, ffmpeg_path):
     wav_file_path = os.path.join(output_folder_path, f"{name}.wav")
 
-    subprocess.call(["ffmpeg", "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-y", wav_file_path])
+    subprocess.call([ffmpeg_path, "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-loglevel", "quiet", "-y", wav_file_path])
 
     return wav_file_path
 
@@ -48,7 +60,7 @@ class TextResult():
         pass
 
 
-def get_text(dirName, filename, model) -> TextResult:
+def get_text(dirName, filename, model, ffmpeg_path) -> TextResult:
     # WAVファイルまたはMP3ファイルであれば処理を実行
     r = TextResult()
 
@@ -63,7 +75,7 @@ def get_text(dirName, filename, model) -> TextResult:
         if not os.path.exists(output_folder_path):
             os.makedirs(output_folder_path)
 
-        wav_file_path = convert_mp3_to_wav(mp3_file_path, filename, output_folder_path)
+        wav_file_path = convert_mp3_to_wav(mp3_file_path, filename, output_folder_path, ffmpeg_path)
         r.path = mp3_file_path
         r.obj = get_text_wav(wav_file_path, model)
 
@@ -73,6 +85,12 @@ def get_text(dirName, filename, model) -> TextResult:
 
 
 def main():
+    ffmpeg_path = get_ffmpeg_path()
+
+    if ffmpeg_path == "":
+        messagebox.showwarning("警告", "ffmpeg.exeがありません。ffmpeg.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
+        exit(1)
+
     # フォルダを開くダイアログを表示して、選択されたフォルダをrootDirに代入する
     root = tk.Tk()
     root.withdraw()
@@ -94,7 +112,7 @@ def main():
     # 再帰的に検索
     for dirName, subdirList, fileList in os.walk(rootDir):
         for filename in fileList:
-            r = get_text(dirName, filename, model)
+            r = get_text(dirName, filename, model, ffmpeg_path)
             if r.path != "":
                 final_results[r.path] = r.obj
 
