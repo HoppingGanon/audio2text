@@ -4,6 +4,7 @@ import json
 import vosk
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import messagebox
 
 # フォルダを開くダイアログを表示して、選択されたフォルダをrootDirに代入する
 root = tk.Tk()
@@ -12,6 +13,9 @@ rootDir = filedialog.askdirectory()
 
 # スクリプトと同じディレクトリにあるモデルを読み込む
 model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model")
+if not os.path.exists(model_path):
+    messagebox.showwarning("警告", "モデルフォルダが見つかりません。アプリケーションを終了します。")
+    exit(1)
 model = vosk.Model(model_path)
 
 # 認識結果を格納する辞書を初期化
