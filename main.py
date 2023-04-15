@@ -1,12 +1,11 @@
 import os
+import subprocess
 import wave
 import json
 import vosk
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
-from ffmpeg import input, output
-
 
 def get_text_wav(filePath, model):
     # 音声ファイルの読み込み
@@ -34,10 +33,7 @@ def get_text_wav(filePath, model):
 def convert_mp3_to_wav(fullname, name, output_folder_path):
     wav_file_path = os.path.join(output_folder_path, f"{name}.wav")
 
-    input_file = input(fullname)
-    audio_stream = input_file.audio
-    audio_stream = audio_stream.filter('aformat', 's16:44100').output(wav_file_path)
-    output(audio_stream, quiet=True).overwrite_output().run()
+    subprocess.call(["ffmpeg", "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-y", wav_file_path])
 
     return wav_file_path
 
@@ -70,6 +66,8 @@ def get_text(dirName, filename, model) -> TextResult:
         wav_file_path = convert_mp3_to_wav(mp3_file_path, filename, output_folder_path)
         r.path = mp3_file_path
         r.obj = get_text_wav(wav_file_path, model)
+
+        os.remove(wav_file_path)
 
     return r
 
