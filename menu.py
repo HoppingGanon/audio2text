@@ -1,6 +1,7 @@
 import tkinter as tk
 
 class SearchForm(tk.Frame):
+
     def __init__(self, master=None):
         super().__init__(master)
 
@@ -21,20 +22,53 @@ class SearchForm(tk.Frame):
         self.button = tk.Button(self, text="Search", command=self.search)
         self.button.pack(side=tk.TOP, padx=10, pady=10)
 
-        # スクロールバーとリストボックスの作成
-        self.scrollbar = tk.Scrollbar(self)
-        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # キャンバスの作成
+        self.canvas = tk.Canvas(self, bg="white", height=300, width=450, scrollregion=(0, 0, 500, 600))
+        self.frame = tk.Frame(self.canvas, bg="white")
 
-        self.result_listbox = tk.Listbox(self, yscrollcommand=self.scrollbar.set, width=100)
-        self.result_listbox.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH)
+        # スクロールイベントの設定
+        self.canvas.bind("<Configure>", self.on_configure)
+        self.canvas.bind_all("<MouseWheel>", self.mouse_scroll)
 
-        self.scrollbar.config(command=self.result_listbox.yview)
+        # キャンバスの表示設定
+        self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.canvas.config(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.create_window((0, 0), window=self.frame, anchor="nw")
 
+        self.update_canvas()
+
+    def update_canvas(self):
+        # 検索ボタンが押された時に呼ばれる関数
+        # フレーム内の既存のラベルを削除
+        for widget in self.frame.winfo_children():
+            widget.destroy()
+
+        # フレーム内にグリッドレイアウトを作成
+        for i in range(4):
+            self.frame.rowconfigure(i, weight=1)
+            for j in range(2):
+                self.frame.columnconfigure(j, weight=1)
+
+                label = tk.Label(self.frame, text="Label " + str(i) + "," + str(j))
+                label.grid(row=i, column=j, padx=10, pady=10)
+
+
+    def on_configure(self, event):
+        # キャンバスのフレームとウィンドウサイズを合わせる
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def mouse_scroll(self, event):
+        # スクロールイベントでキャンバスをスクロール
+        if event.delta:
+            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def search(self):
         # 検索ボタンが押された時に呼ばれる関数
         search_term = self.entry.get()
-        self.result_listbox.insert(tk.END, "a" * 150)
+        print(search_term)
+        self.update_canvas()
 
 if __name__ == "__main__":
     root = tk.Tk()
