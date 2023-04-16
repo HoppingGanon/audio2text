@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox
 import random
 import string
 import json
+from pykakasi import kakasi
 
 def generate_filename(parent_dir, filename_length):
     while True:
@@ -117,6 +118,21 @@ def get_json_name(folder_path, target_path):
             
     return generate_filename(folder_path, 16).replace("\\", "/")
 
+# 読み方変換オブジェクトをインスタンス化
+kakasi = kakasi()
+
+def to_hiragana(text: str):
+    # モードの設定：J(Kanji) to H(Hiragana)
+    kakasi.setMode('J', 'H') 
+
+    # 変換して出力
+    conv = kakasi.getConverter()
+    s = conv.do(text)
+
+    kakasi.setMode('K', 'H') 
+    conv = kakasi.getConverter()
+    return conv.do(s)
+
 def analyze():
     ffmpeg_path = get_ffmpeg_path()
 
@@ -150,6 +166,13 @@ def analyze():
             r = get_text(dirName, filename, model, ffmpeg_path)
             if r.path != "":
                 final_results[r.path] = r.obj
+
+                text = r.obj["text"]
+                hiragana = to_hiragana(text)
+
+                final_results[r.path]["text-nosp"] = text.replace(" ", "")
+                final_results[r.path]["yomi"] = hiragana
+                final_results[r.path]["yomi-nosp"] = hiragana.replace(" ", "")
 
     # final_resultsをJSONファイルとして出力
     json_obj = {}
