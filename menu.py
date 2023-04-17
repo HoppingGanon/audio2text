@@ -37,22 +37,26 @@ class SearchForm(tk.Frame):
         self.canvas.pack(side="left", fill="both", expand=True)
         self.canvas.create_window((0, 0), window=self.frame, anchor="nw")
 
-        self.update_canvas()
+        self.update_canvas(450)
 
-    def update_canvas(self):
+    def update_canvas(self, width):
         # 検索ボタンが押された時に呼ばれる関数
         # フレーム内の既存のラベルを削除
         for widget in self.frame.winfo_children():
             widget.destroy()
 
         # フレーム内にグリッドレイアウトを作成
+        print(width)
         for i in range(4):
             self.frame.rowconfigure(i, weight=1)
-            for j in range(2):
-                self.frame.columnconfigure(j, weight=1)
 
-                label = tk.Label(self.frame, text="Label " + str(i) + "," + str(j))
-                label.grid(row=i, column=j, padx=10, pady=10)
+            self.frame.columnconfigure(1, weight=1)
+            label = tk.Label(self.frame, text="s", wraplength=100)
+            label.grid(row=i, column=1, padx=1, pady=1, sticky=tk.EW)
+
+            self.frame.columnconfigure(1, weight=1)
+            label = tk.Label(self.frame, text="sa", wraplength=width - 120)
+            label.grid(row=i, column=2, padx=1, pady=1, sticky=tk.EW)
 
 
     def on_configure(self, event):
@@ -68,7 +72,9 @@ class SearchForm(tk.Frame):
         # 検索ボタンが押された時に呼ばれる関数
         search_term = self.entry.get()
         print(search_term)
-        self.update_canvas()
+        self.update_idletasks()
+        width = self.frame.winfo_width()
+        self.update_canvas(width)
 
 if __name__ == "__main__":
     root = tk.Tk()
