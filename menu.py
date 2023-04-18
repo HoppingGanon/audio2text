@@ -17,8 +17,10 @@ class SearchForm(tk.Frame):
         # メニューバーの作成
         menubar = tk.Menu(self.master)
         file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label="新規解析", command=self.new_analysis)  # 新規解析コマンドを追加
-        file_menu.add_command(label="解析データを開く", command=self.open_data_file)  # 解析データを開くコマンドを追加
+        file_menu.add_command(label="新規プロジェクト", command=self.new_analysis)  # 新規解析コマンドを追加
+        file_menu.add_command(label="プロジェクトを開く", command=self.open_data_file)  # 解析データを開くコマンドを追加
+        file_menu.add_command(label="プロジェクトの保存(未実装)")  # 解析データを開くコマンドを追加
+        file_menu.add_command(label="プロジェクトの上書き(未実装)")  # 解析データを開くコマンドを追加
         menubar.add_cascade(label="ファイル", menu=file_menu)
         self.master.config(menu=menubar)
 
@@ -96,8 +98,14 @@ class SearchForm(tk.Frame):
             r = i*4
             self.frame.rowconfigure(r, weight=1)
             self.frame.columnconfigure(1, weight=1)
-            border=ttk.Separator(self.frame, orient="horizontal")
-            border.grid(row=r, column=1, columnspan=2, pady=5, sticky="ew")
+            actions_frame=tk.Frame(self.frame)
+            actions_frame.grid(row=r, column=1, columnspan=2, pady=5, sticky="ew")
+            button = tk.Button(actions_frame, text="再生", command=self.search)
+            button.pack(side=tk.LEFT, padx=2)
+            button = tk.Button(actions_frame, text="部分再生", command=self.search)
+            button.pack(side=tk.LEFT, padx=2)
+            button = tk.Button(actions_frame, text="編集(未実装)", command=self.search)
+            button.pack(side=tk.LEFT, padx=2)
             
             r = i*4+1
             self.frame.rowconfigure(r, weight=1)
@@ -121,7 +129,7 @@ class SearchForm(tk.Frame):
             self.frame.columnconfigure(1, weight=1)
             label = tk.Label(self.frame, text="s" * i, wraplength=100, anchor="w", background="#E0F0FF")
             label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
-            label = tk.Label(self.frame, text="sa" * i, wraplength=width - 120, anchor="w", background="#F0F7FF")
+            label = tk.Label(self.frame, text="sdsfgsdfga" * i, wraplength=width - 120, anchor="w", background="#F0F7FF")
             label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
 
     def on_configure(self, event):

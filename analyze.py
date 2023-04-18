@@ -9,6 +9,7 @@ import random
 import string
 import json
 from pykakasi import kakasi
+from pathlib import Path
 
 def generate_filename(parent_dir, filename_length):
     while True:
@@ -77,18 +78,18 @@ class TextResult():
         pass
 
 
-def get_text(dirName, filename, model, ffmpeg_path) -> TextResult:
+def get_text(dirName, filename, model, ffmpeg_path, path_reduce_count) -> TextResult:
     r = TextResult()
     lower = filename.lower()
     if lower.endswith(".mp3") or lower.endswith(".wav") or lower.endswith(".aac"):
-        mp3_file_path = os.path.join(dirName, filename).replace("\\", "/")
+        org_file_path = os.path.join(dirName, filename).replace("\\", "/")
         output_folder_path = os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "audio2text", "cache").replace("\\", "/")
 
         if not os.path.exists(output_folder_path):
             os.makedirs(output_folder_path)
 
-        wav_file_path = convert_to_wav(mp3_file_path, filename, output_folder_path, ffmpeg_path)
-        r.path = mp3_file_path
+        wav_file_path = convert_to_wav(org_file_path, filename, output_folder_path, ffmpeg_path)
+        r.path = os.path.abspath(org_file_path)[path_reduce_count:]
         r.obj = get_text_wav(wav_file_path, model)
 
         os.remove(wav_file_path)
@@ -133,28 +134,50 @@ def to_hiragana(text: str):
     conv = kakasi.getConverter()
     return conv.do(s)
 
-def analyze():
+def analyze(analyze_path: str = "", save_path: str = ""):
     ffmpeg_path = get_ffmpeg_path()
 
     if ffmpeg_path == "":
         messagebox.showwarning("警告", "ffmpeg.exeがありません。ffmpeg.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
-        return
+        return ""
 
     # フォルダを開くダイアログを表示して、選択されたフォルダをrootDirに代入する
     root = tk.Tk()
     root.withdraw()
-    root_dir = filedialog.askdirectory(title="検索対象のフォルダを指定")
 
-    json_path = get_json_name((os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "audio2text", "database")), root_dir)
+    if analyze_path == "":
+        root_dir = filedialog.askdirectory(title="解析対象のフォルダを指定")
+    else:
+        root_dir = analyze_path
 
     if root_dir == "":
-        return
+        return ""
+
+    if save_path == "":
+        loop_f = True
+        while loop_f:
+            json_path = filedialog.asksaveasfilename(
+                title="プロジェクトファイル",
+                initialdir=analyze_path,
+                filetypes=[('プロジェクトファイル(.json)','*.json')],
+                initialfile="project.json"
+                )
+            
+            if Path(json_path).parent.resolve() != Path(root_dir).resolve():
+                loop_f = not messagebox.askyesno("注意", "プロジェクトファイルは解析対象の直下に配置する必要があります。続行しますか？")
+            else:
+                loop_f = False
+    else:
+        json_path = save_path
+
+    if json_path == "":
+        return ""
 
     # スクリプトと同じディレクトリにあるモデルを読み込む
     model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model")
     if not os.path.exists(model_path):
         messagebox.showwarning("警告", "モデルフォルダが見つかりません。モデルをダウンロードして配置してください。")
-        return
+        return ""
     model = vosk.Model(model_path)
 
     # 認識結果を格納する辞書を初期化
@@ -163,26 +186,26 @@ def analyze():
     # 再帰的に検索
     for dirName, _, fileList in os.walk(root_dir):
         for filename in fileList:
-            r = get_text(dirName, filename, model, ffmpeg_path)
+            r = get_text(dirName, filename, model, ffmpeg_path, len(os.path.abspath(root_dir)))
             if r.path != "":
                 final_results[r.path] = r.obj
 
                 text = r.obj["text"]
                 hiragana = to_hiragana(text)
 
-                final_results[r.path]["text-nosp"] = text.replace(" ", "")
+                final_results[r.path]["text_nosp"] = text.replace(" ", "")
                 final_results[r.path]["yomi"] = hiragana
-                final_results[r.path]["yomi-nosp"] = hiragana.replace(" ", "")
+                final_results[r.path]["yomi_nosp"] = hiragana.replace(" ", "")
 
     # final_resultsをJSONファイルとして出力
     json_obj = {}
-    json_obj["root"] = root_dir
     json_obj["data"] = final_results
 
     with open(json_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(json_obj, ensure_ascii=False))
         f.close()
 
+    return json_path
 
 if __name__ == '__main__':
-    analyze()
+    analyze("", "")
