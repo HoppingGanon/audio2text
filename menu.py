@@ -1,7 +1,7 @@
 import tkinter as tk
-import tkinter.ttk as ttk
 from analyze import analyze
-from open import pick_json
+from open import open_json
+from common import get_ffplay_path
 
 class SearchForm(tk.Frame):
     def __init__(self, master=None):
@@ -17,25 +17,12 @@ class SearchForm(tk.Frame):
         # メニューバーの作成
         menubar = tk.Menu(self.master)
         file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label="新規プロジェクト", command=self.new_analysis)  # 新規解析コマンドを追加
+        file_menu.add_command(label="新規プロジェクト", command=self.create_project)  # 新規解析コマンドを追加
         file_menu.add_command(label="プロジェクトを開く", command=self.open_data_file)  # 解析データを開くコマンドを追加
         file_menu.add_command(label="プロジェクトの保存(未実装)")  # 解析データを開くコマンドを追加
         file_menu.add_command(label="プロジェクトの上書き(未実装)")  # 解析データを開くコマンドを追加
         menubar.add_cascade(label="ファイル", menu=file_menu)
         self.master.config(menu=menubar)
-
-        # 検索フレームの作成 ----------------------------
-        self.search_frame = tk.Frame(self)
-        self.search_frame.pack(side=tk.TOP, padx=3, pady=5, anchor="w")
-        # ラベルの作成
-        self.label = tk.Label(self.search_frame, text="Search:")
-        self.label.pack(side=tk.LEFT)
-        # エントリーの作成
-        self.entry = tk.Entry(self.search_frame, width=50)
-        self.entry.pack(side=tk.LEFT, padx=2)
-        # 検索ボタンの作成
-        self.button = tk.Button(self.search_frame, text="検索", command=self.search)
-        self.button.pack(side=tk.LEFT)
 
         # チェックボックスの作成 ----------------------------
         self.check_frame = tk.Frame(self)
@@ -58,49 +45,87 @@ class SearchForm(tk.Frame):
         self.disp_kana = tk.Checkbutton(self.check_frame, text="よみがな", variable=self.disp_kana_val)
         self.disp_kana.pack(side=tk.LEFT)
 
-        # キャンバスの作成
+        # 検索フレームの作成 ----------------------------
+        self.search_frame = tk.Frame(self)
+        self.search_frame.pack(side=tk.TOP, padx=3, pady=5, anchor="w")
+        # ラベルの作成
+        self.label = tk.Label(self.search_frame, text="Search:")
+        self.label.pack(side=tk.LEFT)
+        # エントリーの作成
+        self.entry = tk.Entry(self.search_frame, width=50)
+        self.entry.pack(side=tk.LEFT, padx=2)
+        # 検索ボタンの作成
+        self.button = tk.Button(self.search_frame, text="検索", command=self.search)
+        self.button.pack(side=tk.LEFT)
+
+        # キャンバスの作成 ----------------------------
         self.canvas = tk.Canvas(self, bg="white", height=300, width=450, scrollregion=(0, 0, 500, 600))
-        self.frame = tk.Frame(self.canvas, bg="white")
 
         # スクロールイベントの設定
         self.canvas.bind("<Configure>", self.on_configure)
         self.canvas.bind_all("<MouseWheel>", self.mouse_scroll)
 
-        # キャンバスの表示設定
+        self.create_result_frame()
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        self.project_path = ""
+        self.json_data = {}
+        self.json_data["data"] = []
+
+        self.update_canvas(450)
+    
+    def create_result_frame(self):
+        # キャンバスの作成
         self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
         self.canvas.config(yscrollcommand=self.scrollbar.set)
         self.scrollbar.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.canvas.create_window((0, 0), window=self.frame, anchor="nw")
 
-        self.update_canvas(450)
-        
+        self.result_frame = tk.Frame(self.canvas, bg="white")
+
+        # キャンバスの表示設定
+        self.canvas.create_window((0, 0), window=self.result_frame, anchor="nw")
+
     # 解析データを開くコマンドの関数
     def open_data_file(self):
-        print("Open data file")
-        pick_json()
+        path, obj = open_json()
+        if path != "":
+            self.project_path = path
+            self.json_data = obj
+            self.update_canvas()
 
     # 新規解析コマンドの関数
-    def new_analysis(self):
-        print("New analysis")
-        analyze()
+    def create_project(self):
+        path = analyze()
+        print("解析が完了しました")
+        if path != "":
+            path2, obj = open_json(path)
+            if path2 != "":
+                self.project_path = path2
+                self.json_data = obj
+                self.update_canvas()
 
-    def update_canvas(self, width):
-        # 検索ボタンが押された時に呼ばれる関数
-        # フレーム内の既存のラベルを削除
-        for widget in self.frame.winfo_children():
-            widget.destroy()
+    def update_canvas(self, width = 0):
+        if width == 0:
+            width = self.canvas.winfo_width() - 33
+
+        self.scrollbar.destroy()
+        self.result_frame.destroy()
+
+        self.create_result_frame()
+
+        if width == 0:
+            return
 
         # フレーム内にグリッドレイアウトを作成
-        print(width)
-        for i in range(4):
+        for i, data in enumerate(self.json_data["data"]):
 
             r = i*4
-            self.frame.rowconfigure(r, weight=1)
-            self.frame.columnconfigure(1, weight=1)
-            actions_frame=tk.Frame(self.frame)
+            self.result_frame.rowconfigure(r, weight=1)
+            self.result_frame.columnconfigure(1, weight=1)
+            actions_frame=tk.Frame(self.result_frame)
             actions_frame.grid(row=r, column=1, columnspan=2, pady=5, sticky="ew")
-            button = tk.Button(actions_frame, text="再生", command=self.search)
+            button = tk.Button(actions_frame, text="再生", name=f"play_button_{i}")
+            button.bind("<Button>", play_all)
             button.pack(side=tk.LEFT, padx=2)
             button = tk.Button(actions_frame, text="部分再生", command=self.search)
             button.pack(side=tk.LEFT, padx=2)
@@ -108,29 +133,36 @@ class SearchForm(tk.Frame):
             button.pack(side=tk.LEFT, padx=2)
             
             r = i*4+1
-            self.frame.rowconfigure(r, weight=1)
-            self.frame.columnconfigure(1, weight=1)
-            label = tk.Label(self.frame, text="s" * i, wraplength=100, anchor="w", background="#E0F0FF")
-            label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
-            label = tk.Label(self.frame, text="sa" * i, wraplength=width - 120, anchor="w", background="#F0F7FF")
-            label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
+            if self.disp_fname_val.get():
+                self.result_frame.rowconfigure(r, weight=1)
+                self.result_frame.columnconfigure(1, weight=1)
+                label = tk.Label(self.result_frame, text="ファイル名", wraplength=100, anchor="w", background="#E0F0FF")
+                label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
+                label = tk.Label(self.result_frame, text=data["path"], wraplength=width - 120, anchor="w", background="#F0F7FF")
+                label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
 
             r = i*4+2
-            self.frame.rowconfigure(r, weight=1)
-            self.frame.columnconfigure(1, weight=1)
-            label = tk.Label(self.frame, text="s" * i, wraplength=100, anchor="w", background="#E0F0FF")
-            label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
-            label = tk.Label(self.frame, text="sa" * i, wraplength=width - 120, anchor="w", background="#F0F7FF")
-            label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
+            if self.disp_text_val.get():
+                self.result_frame.rowconfigure(r, weight=1)
+                self.result_frame.columnconfigure(1, weight=1)
+                label = tk.Label(self.result_frame, text="テキスト", wraplength=100, anchor="w", background="#E0F0FF")
+                label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
+                label = tk.Label(self.result_frame, text=data["text_nosp"], wraplength=width - 120, anchor="w", background="#F0F7FF")
+                label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
 
             r = i*4+3
-            self.frame.rowconfigure(r, weight=1)
+            
+            if self.disp_kana_val.get():
+                self.result_frame.rowconfigure(r, weight=1)
+                self.result_frame.columnconfigure(1, weight=1)
+                label = tk.Label(self.result_frame, text="読み仮名", wraplength=100, anchor="w", background="#E0F0FF")
+                label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
+                label = tk.Label(self.result_frame, text=data["yomi_nosp"], wraplength=width - 120, anchor="w", background="#F0F7FF")
+                label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
 
-            self.frame.columnconfigure(1, weight=1)
-            label = tk.Label(self.frame, text="s" * i, wraplength=100, anchor="w", background="#E0F0FF")
-            label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
-            label = tk.Label(self.frame, text="sdsfgsdfga" * i, wraplength=width - 120, anchor="w", background="#F0F7FF")
-            label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
+        # スクロールバーの再設定
+        self.canvas.update()
+        self.on_configure(None)
 
     def on_configure(self, event):
         # キャンバスのフレームとウィンドウサイズを合わせる
@@ -146,8 +178,10 @@ class SearchForm(tk.Frame):
         search_term = self.entry.get()
         print(search_term)
         self.update_idletasks()
-        width = self.canvas.winfo_width() - 33
-        self.update_canvas(width)
+        self.update_canvas()
+
+def play_all(event):
+    print(event.widget._name)
 
 if __name__ == "__main__":
     root = tk.Tk()

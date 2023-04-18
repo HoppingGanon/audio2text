@@ -10,6 +10,7 @@ import string
 import json
 from pykakasi import kakasi
 from pathlib import Path
+from common import get_ffmpeg_path
 
 def generate_filename(parent_dir, filename_length):
     while True:
@@ -22,18 +23,6 @@ def generate_filename(parent_dir, filename_length):
         full_name = os.path.join(parent_dir, filename)
         if not os.path.isfile(full_name):
             return full_name
-
-def get_ffmpeg_path():
-    fmpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg.exe")
-    if os.path.isfile(fmpath):
-        return fmpath
-
-    for p in os.environ["PATH"].split(";"):
-        fmpath = os.path.join(p, "ffmpeg.exe")
-        if os.path.isfile(fmpath):
-            return fmpath
-    return ""
-
 
 def get_text_wav(filePath, model):
     # 音声ファイルの読み込み
@@ -181,21 +170,23 @@ def analyze(analyze_path: str = "", save_path: str = ""):
     model = vosk.Model(model_path)
 
     # 認識結果を格納する辞書を初期化
-    final_results = {}
+    final_results = []
 
     # 再帰的に検索
     for dirName, _, fileList in os.walk(root_dir):
         for filename in fileList:
-            r = get_text(dirName, filename, model, ffmpeg_path, len(os.path.abspath(root_dir)))
+            r = get_text(dirName, filename, model, ffmpeg_path, len(os.path.abspath(root_dir)) + 1)
             if r.path != "":
-                final_results[r.path] = r.obj
-
-                text = r.obj["text"]
+                data = r.obj
+                text = data["text"]
                 hiragana = to_hiragana(text)
 
-                final_results[r.path]["text_nosp"] = text.replace(" ", "")
-                final_results[r.path]["yomi"] = hiragana
-                final_results[r.path]["yomi_nosp"] = hiragana.replace(" ", "")
+                data["path"] = r.path
+                data["text_nosp"] = text.replace(" ", "")
+                data["yomi"] = hiragana
+                data["yomi_nosp"] = hiragana.replace(" ", "")
+
+                final_results.append(data)
 
     # final_resultsをJSONファイルとして出力
     json_obj = {}
