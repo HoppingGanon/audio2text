@@ -8,6 +8,9 @@ from tkinter import filedialog, messagebox
 import random
 import string
 import json
+from pykakasi import kakasi
+from pathlib import Path
+from common import get_ffmpeg_path
 
 def generate_filename(parent_dir, filename_length):
     while True:
@@ -20,18 +23,6 @@ def generate_filename(parent_dir, filename_length):
         full_name = os.path.join(parent_dir, filename)
         if not os.path.isfile(full_name):
             return full_name
-
-def get_ffmpeg_path():
-    fmpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg.exe")
-    if os.path.isfile(fmpath):
-        return fmpath
-
-    for p in os.environ["PATH"].split(";"):
-        fmpath = os.path.join(p, "ffmpeg.exe")
-        if os.path.isfile(fmpath):
-            return fmpath
-    return ""
-
 
 def get_text_wav(filePath, model):
     # 音声ファイルの読み込み
@@ -60,9 +51,7 @@ def get_text_wav(filePath, model):
 
 def convert_to_wav(fullname, name, output_folder_path, ffmpeg_path):
     wav_file_path = os.path.join(output_folder_path, f"{name}.wav")
-
     subprocess.call([ffmpeg_path, "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-loglevel", "quiet", "-y", wav_file_path])
-
     return wav_file_path
 
 
@@ -76,18 +65,18 @@ class TextResult():
         pass
 
 
-def get_text(dirName, filename, model, ffmpeg_path) -> TextResult:
+def get_text(dirName, filename, model, ffmpeg_path, path_reduce_count) -> TextResult:
     r = TextResult()
     lower = filename.lower()
     if lower.endswith(".mp3") or lower.endswith(".wav") or lower.endswith(".aac"):
-        mp3_file_path = os.path.join(dirName, filename).replace("\\", "/")
+        org_file_path = os.path.join(dirName, filename).replace("\\", "/")
         output_folder_path = os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "audio2text", "cache").replace("\\", "/")
 
         if not os.path.exists(output_folder_path):
             os.makedirs(output_folder_path)
 
-        wav_file_path = convert_to_wav(mp3_file_path, filename, output_folder_path, ffmpeg_path)
-        r.path = mp3_file_path
+        wav_file_path = convert_to_wav(org_file_path, filename, output_folder_path, ffmpeg_path)
+        r.path = os.path.abspath(org_file_path)[path_reduce_count:]
         r.obj = get_text_wav(wav_file_path, model)
 
         os.remove(wav_file_path)
@@ -117,49 +106,93 @@ def get_json_name(folder_path, target_path):
             
     return generate_filename(folder_path, 16).replace("\\", "/")
 
-def analyze():
+# 読み方変換オブジェクトをインスタンス化
+kakasi = kakasi()
+
+def to_hiragana(text: str):
+    # モードの設定：J(Kanji) to H(Hiragana)
+    kakasi.setMode('J', 'H') 
+
+    # 変換して出力
+    conv = kakasi.getConverter()
+    s = conv.do(text)
+
+    kakasi.setMode('K', 'H') 
+    conv = kakasi.getConverter()
+    return conv.do(s)
+
+def analyze(analyze_path: str = "", save_path: str = ""):
     ffmpeg_path = get_ffmpeg_path()
 
     if ffmpeg_path == "":
         messagebox.showwarning("警告", "ffmpeg.exeがありません。ffmpeg.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
-        return
+        return ""
 
     # フォルダを開くダイアログを表示して、選択されたフォルダをrootDirに代入する
     root = tk.Tk()
     root.withdraw()
-    root_dir = filedialog.askdirectory(title="検索対象のフォルダを指定")
 
-    json_path = get_json_name((os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "audio2text", "database")), root_dir)
+    if analyze_path == "":
+        root_dir = filedialog.askdirectory(title="解析対象のフォルダを指定")
+    else:
+        root_dir = analyze_path
 
     if root_dir == "":
-        return
+        return ""
+
+    if save_path == "":
+        loop_f = True
+        while loop_f:
+            json_path = filedialog.asksaveasfilename(
+                title="プロジェクトファイル",
+                initialdir=analyze_path,
+                filetypes=[('プロジェクトファイル(.json)','*.json')],
+                initialfile="project.json"
+                )
+            
+            if json_path == "":
+                loop_f = False
+            elif Path(json_path).parent.resolve() != Path(root_dir).resolve():
+                loop_f = not messagebox.askyesno("注意", "プロジェクトファイルは解析対象の直下に配置する必要があります。続行しますか？")
+            else:
+                loop_f = False
+    else:
+        json_path = save_path
+
+    if json_path == "":
+        return ""
 
     # スクリプトと同じディレクトリにあるモデルを読み込む
     model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model")
     if not os.path.exists(model_path):
         messagebox.showwarning("警告", "モデルフォルダが見つかりません。モデルをダウンロードして配置してください。")
-        return
+        return ""
     model = vosk.Model(model_path)
 
     # 認識結果を格納する辞書を初期化
-    final_results = {}
+    final_results = []
 
     # 再帰的に検索
     for dirName, _, fileList in os.walk(root_dir):
         for filename in fileList:
-            r = get_text(dirName, filename, model, ffmpeg_path)
+            r = get_text(dirName, filename, model, ffmpeg_path, len(os.path.abspath(root_dir)) + 1)
             if r.path != "":
-                final_results[r.path] = r.obj
+                data = r.obj
+                del data["text"]
+                for result in data["result"]:
+                    result["yomi"] = to_hiragana(result["word"])
+                data["path"] = r.path
+                final_results.append(data)
 
     # final_resultsをJSONファイルとして出力
     json_obj = {}
-    json_obj["root"] = root_dir
     json_obj["data"] = final_results
 
     with open(json_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(json_obj, ensure_ascii=False))
         f.close()
 
+    return json_path
 
 if __name__ == '__main__':
-    analyze()
+    analyze("", "")
