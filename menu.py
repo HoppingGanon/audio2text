@@ -1,5 +1,8 @@
+import asyncio
 import os
 import subprocess
+import threading
+import time
 import tkinter as tk
 from tkinter import messagebox
 from analyze import analyze, clear_cache
@@ -86,6 +89,10 @@ class SearchForm(tk.Frame):
 
         self.result_data = []
 
+        self.playing_process = None
+        self.is_playing = False
+        self.stop_signal = False
+
         self.update_canvas(450)
     
     def create_result_frame(self):
@@ -142,7 +149,8 @@ class SearchForm(tk.Frame):
             button = tk.Button(actions_frame, text="再生", name=f"play_button_{i}")
             button.bind("<ButtonPress>", self.play_all)
             button.pack(side=tk.LEFT, padx=2)
-            button = tk.Button(actions_frame, text="部分再生", command=self.search)
+            button = tk.Button(actions_frame, text="部分再生", name=f"play_part_button_{i}")
+            button.bind("<ButtonPress>", self.play_part)
             button.pack(side=tk.LEFT, padx=2)
             button = tk.Button(actions_frame, text="編集(未実装)", command=self.search)
             button.pack(side=tk.LEFT, padx=2)
@@ -262,10 +270,71 @@ class SearchForm(tk.Frame):
         fullpath = os.path.join(d, r_path)
         self.ffplay(fullpath)
 
-    def ffplay(self, path):
-        subprocess.call([self.ffplay_path, "-i", path, "-vn", "-showmode", "0", "-autoexit"])
+    def play_part(self, event):
+        index = int(event.widget._name[len("play_part_button_"):])
+        data = self.result_data[index]
+        r_path = data["path"]
+        d = str(Path(self.project_path).parent)
+        fullpath = os.path.join(d, r_path)
+        self.ffplay(fullpath)
+        
+    def create_command(self, main_command, path, start=-1, end=-1):
+        cmd = []
+        cmd.append(main_command)
+        if start >= 0:
+            cmd.append("-ss")
+            cmd.append(str(start))
+        else:
+            start = 0
+        if end >= 0:
+            cmd.append("-t")
+            cmd.append(str(end - start))
+        
+        cmd.append("-i")
+        cmd.append(path)
+
+        return cmd
+
+    def ffplay(self, path, start=-1, end=-1):
+        # 終了要求中なら処理をキャンセル
+        if self.stop_signal:
+            return
+        
+        # 再生中なら強制停止
+        if self.is_playing:
+            self.stop_signal = True
+            time.sleep(0.15)
+
+        cmd = self.create_command(self.ffplay_path, path, start, end)
+        cmd.append("-vn")
+        cmd.append("-showmode")
+        cmd.append("0")
+        cmd.append("-autoexit")
+
+        self.playing_process = threading.Thread(target=lambda: asyncio.run(self.exec_command(cmd)))
+        self.playing_process.start()
+    
+    async def exec_command(self, cmd):
+        p = subprocess.Popen(cmd)
+        self.is_playing = True
+        while True:
+            if self.stop_signal:
+                p.kill()
+                self.is_playing = False
+                time.sleep(0.075)
+                self.stop_signal = False
+                return
+            elif not p.poll() is None:
+                self.is_playing = False
+                self.stop_signal = False
+                return
+            else:
+                self.is_playing = True
+            time.sleep(0.05)
+            print('')
 
     def click_close(self):
+        self.stop_signal = True
         if True or messagebox.askokcancel("確認", "終了しますか？"):
             clear_cache()
             self.master.destroy()
