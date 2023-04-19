@@ -2,7 +2,7 @@ import os
 import subprocess
 import tkinter as tk
 from tkinter import messagebox
-from analyze import analyze
+from analyze import analyze, clear_cache
 from open import open_json
 from common import get_ffplay_path
 from pathlib import Path
@@ -10,6 +10,9 @@ from pathlib import Path
 class SearchForm(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
+
+        # キャッシュのクリア
+        clear_cache()
 
         self.ffplay_path = get_ffplay_path()
         if self.ffplay_path == "":
@@ -22,6 +25,9 @@ class SearchForm(tk.Frame):
         self.master = master
         self.master.title("Search Form")
         self.master.geometry("500x400")
+
+        # ウィンドウの x ボタンが押された時に呼ばれるメソッドを設定
+        self.master.protocol("WM_DELETE_WINDOW", self.click_close)
 
         # メニューバーの作成
         menubar = tk.Menu(self.master)
@@ -198,6 +204,11 @@ class SearchForm(tk.Frame):
 
     def ffplay(self, path):
         subprocess.call([self.ffplay_path, "-i", path, "-vn", "-showmode", "0", "-autoexit"])
+
+    def click_close(self):
+        if True or messagebox.askokcancel("確認", "終了しますか？"):
+            clear_cache()
+            self.master.destroy()
 
 if __name__ == "__main__":
     root = tk.Tk()

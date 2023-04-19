@@ -194,5 +194,15 @@ def analyze(analyze_path: str = "", save_path: str = ""):
 
     return json_path
 
+def clear_cache():
+    cache_path = os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "audio2text", "cache")
+    for filename in os.listdir(cache_path):
+        file_path = os.path.join(cache_path, filename)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
+
 if __name__ == '__main__':
     analyze("", "")
