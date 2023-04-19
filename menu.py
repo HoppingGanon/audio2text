@@ -149,8 +149,9 @@ class SearchForm(tk.Frame):
             button = tk.Button(actions_frame, text="再生", name=f"play_button_{i}")
             button.bind("<ButtonPress>", self.play_all)
             button.pack(side=tk.LEFT, padx=2)
-            button = tk.Button(actions_frame, text="部分再生", name=f"play_part_button_{i}")
-            button.bind("<ButtonPress>", self.play_part)
+            if data["start"] >= 0 and data["end"] >= 0:
+                button = tk.Button(actions_frame, text="部分再生", name=f"play_part_button_{i}")
+                button.bind("<ButtonPress>", self.play_part)
             button.pack(side=tk.LEFT, padx=2)
             button = tk.Button(actions_frame, text="編集(未実装)", command=self.search)
             button.pack(side=tk.LEFT, padx=2)
@@ -213,7 +214,7 @@ class SearchForm(tk.Frame):
         if pattern == "":
             self.set_all_result()
         else:
-            for data in self.json_data["data"]:
+            for json_index, data in enumerate(self.json_data["data"]):
                 target = ""
                 is_text = self.search_target.get() == 0
                 target: str = ""
@@ -256,8 +257,9 @@ class SearchForm(tk.Frame):
                         result["yomi"] = result_text
                     
                     result["is_text"] = is_text
-                    result["end"] = end
                     result["start"] = start
+                    result["end"] = end
+                    result["json_index"] = json_index
                     self.result_data.append(result)
 
         self.update_idletasks()
@@ -271,12 +273,47 @@ class SearchForm(tk.Frame):
         self.ffplay(fullpath)
 
     def play_part(self, event):
-        index = int(event.widget._name[len("play_part_button_"):])
-        data = self.result_data[index]
+        start_index = int(event.widget._name[len("play_part_button_"):])
+        data = self.result_data[start_index]
         r_path = data["path"]
         d = str(Path(self.project_path).parent)
         fullpath = os.path.join(d, r_path)
-        self.ffplay(fullpath)
+
+        is_text = data["is_text"]
+        start = data["start"]
+        end = data["end"]
+        json_index = data["json_index"]
+        json_data = self.json_data["data"][json_index]
+
+        cnt = 0
+        start_index = -1
+        for r in json_data["result"]:
+            if is_text:
+                cnt += len(r["word"])
+            else:
+                cnt += len(r["yomi"])
+            start_index += 1
+            if start <= cnt:
+                break
+        cnt = 0
+        end_index = -1
+        for r in json_data["result"]:
+            if is_text:
+                cnt += len(r["word"])
+            else:
+                cnt += len(r["yomi"])
+            end_index += 1
+            if end <= cnt:
+                break
+        
+        # 有効な文字列の長さが0だった場合の例外処理
+        if start_index == -1 or end_index == -1:
+            return
+
+        start_sec = json_data["result"][start_index]["start"]
+        end_sec = json_data["result"][end_index]["end"]
+
+        self.ffplay(fullpath, start_sec -0.75, end_sec + 0.75)
         
     def create_command(self, main_command, path, start=-1, end=-1):
         cmd = []

@@ -30,7 +30,9 @@ def open_json(path: str = ""):
             yomi_sb.append(r["yomi"])
         d["text"] = "".join(text_sb).replace(" ", "")
         d["yomi"] = "".join(yomi_sb).replace(" ", "")
-
+        d["is_text"] = True
+        d["start"] = -1
+        d["end"] = -1
     return path, data
 
 if __name__ == '__main__':
