@@ -17,6 +17,20 @@ def open_json(path: str = ""):
     
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
+        f.close()
+    
+    text_sb = []
+    yomi_sb = []
+
+    for d in data["data"]:
+        text_sb.clear()
+        yomi_sb.clear()
+        for r in d["result"]:
+            text_sb.append(r["word"])
+            yomi_sb.append(r["yomi"])
+        d["text"] = "".join(text_sb).replace(" ", "")
+        d["yomi"] = "".join(yomi_sb).replace(" ", "")
+
     return path, data
 
 if __name__ == '__main__':

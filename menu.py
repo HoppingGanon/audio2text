@@ -1,11 +1,20 @@
+import os
+import subprocess
 import tkinter as tk
+from tkinter import messagebox
 from analyze import analyze
 from open import open_json
 from common import get_ffplay_path
+from pathlib import Path
 
 class SearchForm(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
+
+        self.ffplay_path = get_ffplay_path()
+        if self.ffplay_path == "":
+            messagebox.showwarning("警告", "ffmpeg.exeがありません。ffmpeg.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
+            return
 
         self.search_results = []
 
@@ -125,7 +134,7 @@ class SearchForm(tk.Frame):
             actions_frame=tk.Frame(self.result_frame)
             actions_frame.grid(row=r, column=1, columnspan=2, pady=5, sticky="ew")
             button = tk.Button(actions_frame, text="再生", name=f"play_button_{i}")
-            button.bind("<Button>", play_all)
+            button.bind("<ButtonPress>", self.play_all)
             button.pack(side=tk.LEFT, padx=2)
             button = tk.Button(actions_frame, text="部分再生", command=self.search)
             button.pack(side=tk.LEFT, padx=2)
@@ -147,7 +156,7 @@ class SearchForm(tk.Frame):
                 self.result_frame.columnconfigure(1, weight=1)
                 label = tk.Label(self.result_frame, text="テキスト", wraplength=100, anchor="w", background="#E0F0FF")
                 label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
-                label = tk.Label(self.result_frame, text=data["text_nosp"], wraplength=width - 120, anchor="w", background="#F0F7FF")
+                label = tk.Label(self.result_frame, text=data["text"], wraplength=width - 120, anchor="w", background="#F0F7FF")
                 label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
 
             r = i*4+3
@@ -157,7 +166,7 @@ class SearchForm(tk.Frame):
                 self.result_frame.columnconfigure(1, weight=1)
                 label = tk.Label(self.result_frame, text="読み仮名", wraplength=100, anchor="w", background="#E0F0FF")
                 label.grid(row=r, column=1, padx=1, pady=1, sticky=tk.EW)
-                label = tk.Label(self.result_frame, text=data["yomi_nosp"], wraplength=width - 120, anchor="w", background="#F0F7FF")
+                label = tk.Label(self.result_frame, text=data["yomi"], wraplength=width - 120, anchor="w", background="#F0F7FF")
                 label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
 
         # スクロールバーの再設定
@@ -180,8 +189,15 @@ class SearchForm(tk.Frame):
         self.update_idletasks()
         self.update_canvas()
 
-def play_all(event):
-    print(event.widget._name)
+    def play_all(self, event):
+        index = int(event.widget._name[len("play_button_"):])
+        r_path = self.json_data["data"][index]["path"]
+        d = str(Path(self.project_path).parent)
+        fullpath = os.path.join(d, r_path)
+        self.ffplay(fullpath)
+
+    def ffplay(self, path):
+        subprocess.call([self.ffplay_path, "-i", path, "-vn", "-showmode", "0", "-autoexit"])
 
 if __name__ == "__main__":
     root = tk.Tk()

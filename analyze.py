@@ -51,9 +51,7 @@ def get_text_wav(filePath, model):
 
 def convert_to_wav(fullname, name, output_folder_path, ffmpeg_path):
     wav_file_path = os.path.join(output_folder_path, f"{name}.wav")
-
     subprocess.call([ffmpeg_path, "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-loglevel", "quiet", "-y", wav_file_path])
-
     return wav_file_path
 
 
@@ -152,7 +150,9 @@ def analyze(analyze_path: str = "", save_path: str = ""):
                 initialfile="project.json"
                 )
             
-            if Path(json_path).parent.resolve() != Path(root_dir).resolve():
+            if json_path == "":
+                loop_f = False
+            elif Path(json_path).parent.resolve() != Path(root_dir).resolve():
                 loop_f = not messagebox.askyesno("注意", "プロジェクトファイルは解析対象の直下に配置する必要があります。続行しますか？")
             else:
                 loop_f = False
@@ -178,14 +178,10 @@ def analyze(analyze_path: str = "", save_path: str = ""):
             r = get_text(dirName, filename, model, ffmpeg_path, len(os.path.abspath(root_dir)) + 1)
             if r.path != "":
                 data = r.obj
-                text = data["text"]
-                hiragana = to_hiragana(text)
-
+                del data["text"]
+                for result in data["result"]:
+                    result["yomi"] = to_hiragana(result["word"])
                 data["path"] = r.path
-                data["text_nosp"] = text.replace(" ", "")
-                data["yomi"] = hiragana
-                data["yomi_nosp"] = hiragana.replace(" ", "")
-
                 final_results.append(data)
 
     # final_resultsをJSONファイルとして出力
