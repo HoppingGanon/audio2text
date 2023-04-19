@@ -206,36 +206,48 @@ class SearchForm(tk.Frame):
             self.set_all_result()
         else:
             for data in self.json_data["data"]:
-                text: str = data["text"]
-                yomi: str = data["yomi"]
+                target = ""
+                is_text = self.search_target.get() == 0
+                target: str = ""
+                if is_text:
+                    target = data["text"]
+                else:
+                    target = data["yomi"]
+
                 path: str = data["path"]
 
                 loop = True
                 while loop:
                     # textから検索
-                    m = re.search(pattern, text)
+                    m = re.search(pattern, target)
                     if m is None:
                         break
 
                     start = m.start()
                     end = m.end()
                     start2 = max(start - prefix_count, 0)
-                    length = len(text)
+                    length = len(target)
                     end2 = min(end + suffix_count, length)
 
                     # 前後の文を含める
-                    result_text = text[start2:end2]
+                    result_text = target[start2:end2]
                     if 0 != start2:
                         result_text = "... " + result_text
                     if length != end2:
                         result_text = result_text + " ..."
 
-                    text = text[end+1:]
+                    target = target[end+1:]
 
                     result = {}
                     result["path"] = path
-                    result["text"] = result_text
-                    result["yomi"] = ""
+                    if is_text:
+                        result["text"] = result_text
+                        result["yomi"] = ""
+                    else:
+                        result["text"] = ""
+                        result["yomi"] = result_text
+                    
+                    result["is_text"] = is_text
                     result["end"] = end
                     result["start"] = start
                     self.result_data.append(result)
