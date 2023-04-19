@@ -6,6 +6,7 @@ from analyze import analyze, clear_cache
 from open import open_json
 from common import get_ffplay_path
 from pathlib import Path
+import re
 
 class SearchForm(tk.Frame):
     def __init__(self, master=None):
@@ -42,22 +43,18 @@ class SearchForm(tk.Frame):
         # チェックボックスの作成 ----------------------------
         self.check_frame = tk.Frame(self)
         self.check_frame.pack(side=tk.TOP, padx=3, pady=10, anchor="w")
-        label = tk.Label(self.check_frame, text="表示:")
-        label.pack(side=tk.LEFT, padx=2)
 
         self.disp_fname_val = tk.BooleanVar()
         self.disp_fname_val.set(True)
-        self.disp_fname = tk.Checkbutton(self.check_frame, text="ファイル名", variable=self.disp_fname_val)
+        self.disp_fname = tk.Checkbutton(self.check_frame, text="ファイル名を表示", variable=self.disp_fname_val)
         self.disp_fname.pack(side=tk.LEFT)
         
-        self.disp_text_val = tk.BooleanVar()
-        self.disp_text_val.set(True)
-        self.disp_text = tk.Checkbutton(self.check_frame, text="テキスト", variable=self.disp_text_val)
+        self.search_target = tk.IntVar()
+        self.search_target.set(0)
+
+        self.disp_text = tk.Radiobutton(self.check_frame, text="文字列検索", value=0, variable=self.search_target)
         self.disp_text.pack(side=tk.LEFT)
-        
-        self.disp_kana_val = tk.BooleanVar()
-        self.disp_kana_val.set(True)
-        self.disp_kana = tk.Checkbutton(self.check_frame, text="よみがな", variable=self.disp_kana_val)
+        self.disp_kana = tk.Radiobutton(self.check_frame, text="よみがな検索", value=1, variable=self.search_target)
         self.disp_kana.pack(side=tk.LEFT)
 
         # 検索フレームの作成 ----------------------------
@@ -87,6 +84,8 @@ class SearchForm(tk.Frame):
         self.json_data = {}
         self.json_data["data"] = []
 
+        self.result_data = []
+
         self.update_canvas(450)
     
     def create_result_frame(self):
@@ -106,6 +105,7 @@ class SearchForm(tk.Frame):
         if path != "":
             self.project_path = path
             self.json_data = obj
+            self.set_all_result()
             self.update_canvas()
 
     # 新規解析コマンドの関数
@@ -117,6 +117,7 @@ class SearchForm(tk.Frame):
             if path2 != "":
                 self.project_path = path2
                 self.json_data = obj
+                self.set_all_result()
                 self.update_canvas()
 
     def update_canvas(self, width = 0):
@@ -132,8 +133,7 @@ class SearchForm(tk.Frame):
             return
 
         # フレーム内にグリッドレイアウトを作成
-        for i, data in enumerate(self.json_data["data"]):
-
+        for i, data in enumerate(self.result_data):
             r = i*4
             self.result_frame.rowconfigure(r, weight=1)
             self.result_frame.columnconfigure(1, weight=1)
@@ -157,7 +157,7 @@ class SearchForm(tk.Frame):
                 label.grid(row=r, column=2, padx=1, pady=1, sticky=tk.EW)
 
             r = i*4+2
-            if self.disp_text_val.get():
+            if self.search_target.get() == 0:
                 self.result_frame.rowconfigure(r, weight=1)
                 self.result_frame.columnconfigure(1, weight=1)
                 label = tk.Label(self.result_frame, text="テキスト", wraplength=100, anchor="w", background="#E0F0FF")
@@ -167,7 +167,7 @@ class SearchForm(tk.Frame):
 
             r = i*4+3
             
-            if self.disp_kana_val.get():
+            if self.search_target.get() == 1:
                 self.result_frame.rowconfigure(r, weight=1)
                 self.result_frame.columnconfigure(1, weight=1)
                 label = tk.Label(self.result_frame, text="読み仮名", wraplength=100, anchor="w", background="#E0F0FF")
@@ -178,6 +178,7 @@ class SearchForm(tk.Frame):
         # スクロールバーの再設定
         self.canvas.update()
         self.on_configure(None)
+        self.canvas.yview_moveto(0)
 
     def on_configure(self, event):
         # キャンバスのフレームとウィンドウサイズを合わせる
@@ -188,16 +189,63 @@ class SearchForm(tk.Frame):
         if event.delta:
             self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
+    def set_all_result(self):
+        for data in self.json_data["data"]:
+            self.result_data.append(data)
+
     def search(self):
         # 検索ボタンが押された時に呼ばれる関数
-        search_term = self.entry.get()
-        print(search_term)
+
+        prefix_count = 20
+        suffix_count = 20
+
+        self.result_data.clear()
+        pattern = self.entry.get()
+        
+        if pattern == "":
+            self.set_all_result()
+        else:
+            for data in self.json_data["data"]:
+                text: str = data["text"]
+                yomi: str = data["yomi"]
+                path: str = data["path"]
+
+                loop = True
+                while loop:
+                    # textから検索
+                    m = re.search(pattern, text)
+                    if m is None:
+                        break
+
+                    start = m.start()
+                    end = m.end()
+                    start2 = max(start - prefix_count, 0)
+                    length = len(text)
+                    end2 = min(end + suffix_count, length)
+
+                    # 前後の文を含める
+                    result_text = text[start2:end2]
+                    if 0 != start2:
+                        result_text = "... " + result_text
+                    if length != end2:
+                        result_text = result_text + " ..."
+
+                    text = text[end+1:]
+
+                    result = {}
+                    result["path"] = path
+                    result["text"] = result_text
+                    result["yomi"] = ""
+                    result["end"] = end
+                    result["start"] = start
+                    self.result_data.append(result)
+
         self.update_idletasks()
         self.update_canvas()
 
     def play_all(self, event):
         index = int(event.widget._name[len("play_button_"):])
-        r_path = self.json_data["data"][index]["path"]
+        r_path = self.result_data[index]["path"]
         d = str(Path(self.project_path).parent)
         fullpath = os.path.join(d, r_path)
         self.ffplay(fullpath)
