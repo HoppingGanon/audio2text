@@ -8,7 +8,7 @@ class Context:
 
 def open_json(path: str = ""):
     if path == "":
-        path = filedialog.askopenfilename()
+        path = filedialog.askopenfilename(title="プロジェクトを開く", filetypes=[('プロジェクトファイル','*.json')])
 
     if path == "":
         data = {}

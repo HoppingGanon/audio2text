@@ -146,7 +146,7 @@ def analyze(analyze_path: str = "", save_path: str = ""):
             json_path = filedialog.asksaveasfilename(
                 title="プロジェクトファイル",
                 initialdir=analyze_path,
-                filetypes=[('プロジェクトファイル(.json)','*.json')],
+                filetypes=[('プロジェクトファイル','*.json')],
                 initialfile="project.json"
                 )
             

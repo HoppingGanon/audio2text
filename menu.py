@@ -5,6 +5,7 @@ import threading
 import time
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import filedialog
 from analyze import analyze, clear_cache
 from open import open_json
 from common import get_ffplay_path
@@ -159,6 +160,10 @@ class SearchForm(tk.Frame):
             button.pack(side=tk.LEFT, padx=2)
 
             button = tk.Button(actions_frame, text="編集(未実装)")
+            button.pack(side=tk.LEFT, padx=2)
+            
+            button = tk.Button(actions_frame, text="抽出", name=f"save_button_{i}")
+            button.bind("<ButtonRelease>", self.save)
             button.pack(side=tk.LEFT, padx=2)
             
             r = i*4+1
@@ -322,6 +327,15 @@ class SearchForm(tk.Frame):
     
     def stop(self, event):
         self.stop_signal = True
+    
+    def save(self, event):
+        self.stop_signal = True
+        file = filedialog.asksaveasfilename(
+            title="ファイル",
+            filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav')],
+            initialfile=".mp3"
+            )
+        return
         
     def create_command(self, main_command, path, start=-1, end=-1):
         cmd = []
