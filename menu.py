@@ -152,8 +152,13 @@ class SearchForm(tk.Frame):
             if data["start"] >= 0 and data["end"] >= 0:
                 button = tk.Button(actions_frame, text="部分再生", name=f"play_part_button_{i}")
                 button.bind("<ButtonPress>", self.play_part)
+                button.pack(side=tk.LEFT, padx=2)
+            
+            button = tk.Button(actions_frame, text="停止", name=f"stop_button_{i}")
+            button.bind("<ButtonPress>", self.stop)
             button.pack(side=tk.LEFT, padx=2)
-            button = tk.Button(actions_frame, text="編集(未実装)", command=self.search)
+
+            button = tk.Button(actions_frame, text="編集(未実装)")
             button.pack(side=tk.LEFT, padx=2)
             
             r = i*4+1
@@ -314,6 +319,9 @@ class SearchForm(tk.Frame):
         end_sec = json_data["result"][end_index]["end"]
 
         self.ffplay(fullpath, start_sec -0.75, end_sec + 0.75)
+    
+    def stop(self, event):
+        self.stop_signal = True
         
     def create_command(self, main_command, path, start=-1, end=-1):
         cmd = []
