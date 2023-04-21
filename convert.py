@@ -1,11 +1,17 @@
 import tkinter as tk
 
-class Application(tk.Frame):
-    def __init__(self, master=None):
+class Converter(tk.Frame):
+    def __init__(self, master, start_limit: float, end_limit: float, init_start: float, init_end: int, ffmpeg_path: str, path: str):
         super().__init__(master)
         self.master = master
-        self.create_widgets()
         self.is_changing = False
+        self.start_limit = start_limit
+        self.end_limit = end_limit
+        self.start_val = tk.DoubleVar(value=init_start)
+        self.end_val = tk.DoubleVar(value=init_end)
+        self.ffmpeg_path = ffmpeg_path
+        self.path = path
+        self.create_widgets()
 
     def create_widgets(self):
         # フォーム全体
@@ -15,11 +21,10 @@ class Application(tk.Frame):
         self.start_label = tk.Label(self.master, text="開始位置")
         self.start_label.grid(row=0, column=0, padx=5, pady=10)
 
-        self.start_val = tk.DoubleVar(value=0)
-        self.start_slider = tk.Scale(self.master, from_=0, to=10, resolution=0.01, orient=tk.HORIZONTAL, variable=self.start_val, command=self.update_start_entry_from_slider, cursor='sb_h_double_arrow')
+        self.start_slider = tk.Scale(self.master, from_=self.start_limit, to=self.end_limit, resolution=0.01, orient=tk.HORIZONTAL, variable=self.start_val, command=self.update_start_entry_from_slider, cursor='sb_h_double_arrow')
         self.start_slider.grid(row=0, column=1, sticky="ew")
 
-        self.start_entry_val = tk.StringVar(value="0.00")
+        self.start_entry_val = tk.StringVar(value=str(self.start_val.get()))
         self.start_entry = tk.Entry(self.master, textvariable=self.start_entry_val)
         self.start_entry.grid(row=0, column=2, padx=5, sticky="ew")
 
@@ -27,11 +32,10 @@ class Application(tk.Frame):
         self.end_label = tk.Label(self.master, text="終了位置")
         self.end_label.grid(row=1, column=0, padx=5, pady=10)
 
-        self.end_val = tk.DoubleVar(value=0)
-        self.end_slider = tk.Scale(self.master, from_=0, to=10, resolution=0.01, orient=tk.HORIZONTAL, variable=self.end_val, command=self.update_end_entry_from_slider, cursor='sb_h_double_arrow')
+        self.end_slider = tk.Scale(self.master, from_=self.start_limit, to=self.end_limit, resolution=0.01, orient=tk.HORIZONTAL, variable=self.end_val, command=self.update_end_entry_from_slider, cursor='sb_h_double_arrow')
         self.end_slider.grid(row=1, column=1, sticky="ew")
 
-        self.end_entry_val = tk.StringVar(value="0.00")
+        self.end_entry_val = tk.StringVar(value=str(self.end_val.get()))
         self.end_entry = tk.Entry(self.master, textvariable=self.end_entry_val)
         self.end_entry.grid(row=1, column=2, padx=5, sticky="ew")
 
@@ -107,8 +111,22 @@ class Application(tk.Frame):
 
     def extract(self):
         # 抽出ボタンをクリックした時の処理を実装する
+
+        start = self.start_val.get()
+        end = self.end_val.get()
+
+        command = []
+        command.append(self.ffmpeg_path)
+        command.append("-i")
+        command.append(self.path)
+        command.append("-ss")
+        command.append(str(start))
+        command.append("-t")
+        command.append(str(end - start))
+        print(command)
+        
         pass
 
 root = tk.Tk()
-app = Application(master=root)
+app = Converter(root, 0, 100, 1, 10, "ffmpeg.exe", "")
 app.mainloop()

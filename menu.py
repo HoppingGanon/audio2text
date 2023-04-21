@@ -372,7 +372,7 @@ class SearchForm(tk.Frame):
 
         self.playing_process = threading.Thread(target=lambda: asyncio.run(self.exec_command(cmd)))
         self.playing_process.start()
-    
+
     async def exec_command(self, cmd):
         p = subprocess.Popen(cmd)
         self.is_playing = True
@@ -390,7 +390,6 @@ class SearchForm(tk.Frame):
             else:
                 self.is_playing = True
             time.sleep(0.05)
-            print('')
 
     def click_close(self):
         self.stop_signal = True
