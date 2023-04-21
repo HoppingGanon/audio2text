@@ -32,3 +32,20 @@ def get_ffprobe_path():
         if os.path.isfile(fmpath):
             return fmpath
     return ""
+
+def create_command(main_command, path, start=-1, end=-1):
+    cmd = []
+    cmd.append(main_command)
+    if start >= 0:
+        cmd.append("-ss")
+        cmd.append(str(start))
+    else:
+        start = 0
+    if end >= 0:
+        cmd.append("-t")
+        cmd.append(str(end - start))
+    
+    cmd.append("-i")
+    cmd.append(path)
+
+    return cmd

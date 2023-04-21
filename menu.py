@@ -1,14 +1,12 @@
-import asyncio
 import os
 import subprocess
-import threading
 import time
 import tkinter as tk
 from tkinter import messagebox
 from analyze import analyze, clear_cache
 import convert
 from open import open_json
-from common import get_ffplay_path, get_ffmpeg_path, get_ffprobe_path
+from common import create_command, get_ffplay_path, get_ffmpeg_path, get_ffprobe_path
 from pathlib import Path
 import re
 
@@ -214,6 +212,7 @@ class SearchForm(tk.Frame):
 
     def search(self):
         # 検索ボタンが押された時に呼ばれる関数
+        self.stop(None)
 
         prefix_count = 20
         suffix_count = 20
@@ -342,30 +341,15 @@ class SearchForm(tk.Frame):
         self.stop(None)
         start_index = int(event.widget._name[len("save_button_"):])
         data = self.result_data[start_index]
-        path = data["path"]
+        r_path = data["path"]
+        d = str(Path(self.project_path).parent)
+        fullpath = os.path.join(d, r_path)
         json_index = data["json_index"]
         json_data = self.json_data["data"][json_index]
         duration = json_data["duration"]
         start_sec, end_sec = self.get_part_time(data)
-        convert.show(0, duration, start_sec, end_sec, path)
+        convert.show(0, duration, start_sec, end_sec, fullpath)
         return
-        
-    def create_command(self, main_command, path, start=-1, end=-1):
-        cmd = []
-        cmd.append(main_command)
-        if start >= 0:
-            cmd.append("-ss")
-            cmd.append(str(start))
-        else:
-            start = 0
-        if end >= 0:
-            cmd.append("-t")
-            cmd.append(str(end - start))
-        
-        cmd.append("-i")
-        cmd.append(path)
-
-        return cmd
 
     def ffplay(self, path, start=-1, end=-1):
         # 再生中なら強制停止
@@ -373,7 +357,7 @@ class SearchForm(tk.Frame):
             self.stop(None)
             time.sleep(0.15)
 
-        cmd = self.create_command(self.ffplay_path, path, start, end)
+        cmd = create_command(self.ffplay_path, path, start, end)
         cmd.append("-vn")
         cmd.append("-showmode")
         cmd.append("0")

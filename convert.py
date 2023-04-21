@@ -1,18 +1,23 @@
+import os
+import subprocess
 import tkinter as tk
 from tkinter import filedialog
-from common import get_ffmpeg_path
+from tkinter import messagebox
+from common import create_command, get_ffmpeg_path, get_ffplay_path
 
 class Converter(tk.Frame):
     def __init__(self, master, start_limit: float, end_limit: float, init_start: float, init_end: float, path: str):
         super().__init__(master)
         print(start_limit, end_limit, init_start, init_end, path)
         self.master = master
+        self.save_process = None
         self.is_changing = False
         self.start_limit = start_limit
         self.end_limit = end_limit
         self.start_val = tk.DoubleVar(value=0)
         self.end_val = tk.DoubleVar(value=0)
         self.ffmpeg_path = get_ffmpeg_path()
+        self.ffplay_path = get_ffplay_path()
         self.path = path
         self.create_widgets(init_start, init_end)
 
@@ -56,15 +61,23 @@ class Converter(tk.Frame):
 
         # ボタンのフォーム
         self.button_frame = tk.Frame(self.master)
-        self.button_frame.grid(row=2, column=2, pady=10)
-
-        # 抽出ボタン
-        self.extract_button = tk.Button(self.button_frame, text="抽出", command=self.extract)
-        self.extract_button.pack(side=tk.LEFT)
+        self.button_frame.grid(row=2, column=1, columnspan=2, padx=3, pady=3, sticky="ew")
 
         # キャンセルボタン
         self.cancel_button = tk.Button(self.button_frame, text="キャンセル", command=self.close)
         self.cancel_button.pack(side=tk.RIGHT)
+
+        # 抽出ボタン
+        self.extract_button = tk.Button(self.button_frame, text="保存", command=self.extract)
+        self.extract_button.pack(side=tk.RIGHT)
+
+        # 停止ボタン
+        self.extract_button = tk.Button(self.button_frame, text="停止", command=self.stop)
+        self.extract_button.pack(side=tk.RIGHT)
+
+        # 再生ボタン
+        self.extract_button = tk.Button(self.button_frame, text="再生", command=self.play)
+        self.extract_button.pack(side=tk.RIGHT)
 
         # 外側の余白を増やす
         for i in range(3):
@@ -87,7 +100,7 @@ class Converter(tk.Frame):
                 start_entry_val = self.end_limit
             self.start_slider.set(start_entry_val)
         except ValueError:
-            print("e")
+            pass
         finally:
             self.is_changing = False
 
@@ -134,27 +147,43 @@ class Converter(tk.Frame):
 
     def extract(self):
         # 抽出ボタンをクリックした時の処理を実装する
-        
-        file = filedialog.asksaveasfilename(
+        self.stop()
+
+        save_file = filedialog.asksaveasfilename(
             title="ファイル",
             filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav')],
-            initialfile=".mp3"
+            initialfile="extract.mp3"
             )
 
-        start = self.start_val.get()
-        end = self.end_val.get()
+        start = self.start_slider.get()
+        end = self.end_slider.get()
+        cmd = create_command(self.ffmpeg_path, self.path, start, end)
+        cmd.append("-y")
+        cmd.append(save_file)
 
-        command = []
-        command.append(self.ffmpeg_path)
-        command.append("-i")
-        command.append(self.path)
-        command.append("-ss")
-        command.append(str(start))
-        command.append("-t")
-        command.append(str(end - start))
-        print(command)
+        print(cmd)
+
+        p = subprocess.Popen(cmd)
+        p.wait()
+        messagebox.showinfo("完了" ,f"抽出した音声を'{save_file}'に保存しました")
+    
+    def play(self):
+        # 再生ボタンをクリックした時の処理を実装する
+        start = self.start_slider.get()
+        end = self.end_slider.get()
+        cmd = create_command(self.ffplay_path, self.path, start, end)
+        cmd.append("-vn")
+        cmd.append("-showmode")
+        cmd.append("0")
+        cmd.append("-autoexit")
+        self.save_process = subprocess.Popen(cmd)
+
+    def stop(self):
+        if (not self.save_process is None) and (self.save_process.poll is None):
+            self.save_process.kill()
         
     def close(self):
+        self.stop()
         self.master.destroy()
 
 def show(start_limit: float, end_limit: float, init_start: float, init_end: int, path: str):
