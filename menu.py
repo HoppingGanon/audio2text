@@ -91,8 +91,6 @@ class SearchForm(tk.Frame):
         self.result_data = []
 
         self.playing_process = None
-        self.is_playing = False
-        self.stop_signal = False
 
         self.update_canvas(450)
     
@@ -326,10 +324,14 @@ class SearchForm(tk.Frame):
         self.ffplay(fullpath, start_sec -0.75, end_sec + 0.75)
     
     def stop(self, event):
-        self.stop_signal = True
+        if self.is_playing():
+            self.playing_process.kill()
+    
+    def is_playing(self):
+        return (not self.playing_process is None) and self.playing_process.poll() is None
     
     def save(self, event):
-        self.stop_signal = True
+        self.stop(None)
         file = filedialog.asksaveasfilename(
             title="ファイル",
             filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav')],
@@ -355,13 +357,9 @@ class SearchForm(tk.Frame):
         return cmd
 
     def ffplay(self, path, start=-1, end=-1):
-        # 終了要求中なら処理をキャンセル
-        if self.stop_signal:
-            return
-        
         # 再生中なら強制停止
-        if self.is_playing:
-            self.stop_signal = True
+        if self.is_playing():
+            self.stop(None)
             time.sleep(0.15)
 
         cmd = self.create_command(self.ffplay_path, path, start, end)
@@ -370,29 +368,10 @@ class SearchForm(tk.Frame):
         cmd.append("0")
         cmd.append("-autoexit")
 
-        self.playing_process = threading.Thread(target=lambda: asyncio.run(self.exec_command(cmd)))
-        self.playing_process.start()
-
-    async def exec_command(self, cmd):
-        p = subprocess.Popen(cmd)
-        self.is_playing = True
-        while True:
-            if self.stop_signal:
-                p.kill()
-                self.is_playing = False
-                time.sleep(0.075)
-                self.stop_signal = False
-                return
-            elif not p.poll() is None:
-                self.is_playing = False
-                self.stop_signal = False
-                return
-            else:
-                self.is_playing = True
-            time.sleep(0.05)
+        self.playing_process = subprocess.Popen(cmd)
 
     def click_close(self):
-        self.stop_signal = True
+        self.stop(None)
         if True or messagebox.askokcancel("確認", "終了しますか？"):
             clear_cache()
             self.master.destroy()
