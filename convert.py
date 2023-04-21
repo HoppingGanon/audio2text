@@ -1,19 +1,22 @@
 import tkinter as tk
+from tkinter import filedialog
+from common import get_ffmpeg_path
 
 class Converter(tk.Frame):
-    def __init__(self, master, start_limit: float, end_limit: float, init_start: float, init_end: int, ffmpeg_path: str, path: str):
+    def __init__(self, master, start_limit: float, end_limit: float, init_start: float, init_end: float, path: str):
         super().__init__(master)
+        print(start_limit, end_limit, init_start, init_end, path)
         self.master = master
         self.is_changing = False
         self.start_limit = start_limit
         self.end_limit = end_limit
-        self.start_val = tk.DoubleVar(value=init_start)
-        self.end_val = tk.DoubleVar(value=init_end)
-        self.ffmpeg_path = ffmpeg_path
+        self.start_val = tk.DoubleVar(value=0)
+        self.end_val = tk.DoubleVar(value=0)
+        self.ffmpeg_path = get_ffmpeg_path()
         self.path = path
-        self.create_widgets()
+        self.create_widgets(init_start, init_end)
 
-    def create_widgets(self):
+    def create_widgets(self, init_start, init_end):
         # フォーム全体
         self.master.geometry("480x180")
 
@@ -23,9 +26,11 @@ class Converter(tk.Frame):
 
         self.start_slider = tk.Scale(self.master, from_=self.start_limit, to=self.end_limit, resolution=0.01, orient=tk.HORIZONTAL, variable=self.start_val, command=self.update_start_entry_from_slider, cursor='sb_h_double_arrow')
         self.start_slider.grid(row=0, column=1, sticky="ew")
+        self.start_slider.set(init_start)
 
-        self.start_entry_val = tk.StringVar(value=str(self.start_val.get()))
+        self.start_entry_val = tk.StringVar(value=str(init_start))
         self.start_entry = tk.Entry(self.master, textvariable=self.start_entry_val)
+        self.change_start_entry(str(init_start))
         self.start_entry.grid(row=0, column=2, padx=5, sticky="ew")
 
         # 終了位置スライダーとエントリー
@@ -34,9 +39,11 @@ class Converter(tk.Frame):
 
         self.end_slider = tk.Scale(self.master, from_=self.start_limit, to=self.end_limit, resolution=0.01, orient=tk.HORIZONTAL, variable=self.end_val, command=self.update_end_entry_from_slider, cursor='sb_h_double_arrow')
         self.end_slider.grid(row=1, column=1, sticky="ew")
+        self.end_slider.set(init_end)
 
-        self.end_entry_val = tk.StringVar(value=str(self.end_val.get()))
+        self.end_entry_val = tk.StringVar(value=str(init_end))
         self.end_entry = tk.Entry(self.master, textvariable=self.end_entry_val)
+        self.change_end_entry(str(init_end))
         self.end_entry.grid(row=1, column=2, padx=5, sticky="ew")
 
         # バインドの設定
@@ -56,7 +63,7 @@ class Converter(tk.Frame):
         self.extract_button.pack(side=tk.LEFT)
 
         # キャンセルボタン
-        self.cancel_button = tk.Button(self.button_frame, text="キャンセル", command=self.master.quit)
+        self.cancel_button = tk.Button(self.button_frame, text="キャンセル", command=self.close)
         self.cancel_button.pack(side=tk.RIGHT)
 
         # 外側の余白を増やす
@@ -73,8 +80,11 @@ class Converter(tk.Frame):
         
         self.is_changing = True
         try:
-            start_entry_val = float(self.start_entry_val.get())
-            print(start_entry_val)
+            start_entry_val = float(self.start_entry.get())
+            if start_entry_val < self.start_limit:
+                start_entry_val = self.start_limit
+            elif self.end_limit < start_entry_val:
+                start_entry_val = self.end_limit
             self.start_slider.set(start_entry_val)
         except ValueError:
             print("e")
@@ -87,19 +97,31 @@ class Converter(tk.Frame):
         
         self.is_changing = True
         try:
-            end_entry_val = float(self.end_entry_val.get())
+            end_entry_val = float(self.end_entry.get())
+            if end_entry_val < self.start_limit:
+                end_entry_val = self.start_limit
+            elif self.end_limit < end_entry_val:
+                end_entry_val = self.end_limit
             self.end_slider.set(end_entry_val)
         except ValueError:
             pass
         finally:
             self.is_changing = False
 
+    def change_start_entry(self, v: str):
+        self.start_entry.delete(0, tk.END)
+        self.start_entry.insert(0, v)
+
+    def change_end_entry(self, v: str):
+        self.end_entry.delete(0, tk.END)
+        self.end_entry.insert(0, v)
+
     def update_start_entry_from_slider(self, event=None):
         if self.is_changing:
             return
         
         self.is_changing = True
-        self.start_entry_val.set(str(self.start_slider.get()))
+        self.change_start_entry(str(self.start_slider.get()))
         self.is_changing = False
 
     def update_end_entry_from_slider(self, event=None):
@@ -107,11 +129,17 @@ class Converter(tk.Frame):
             return
         
         self.is_changing = True
-        self.end_entry_val.set(str(self.end_slider.get()))
+        self.change_end_entry(str(self.end_slider.get()))
         self.is_changing = False
 
     def extract(self):
         # 抽出ボタンをクリックした時の処理を実装する
+        
+        file = filedialog.asksaveasfilename(
+            title="ファイル",
+            filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav')],
+            initialfile=".mp3"
+            )
 
         start = self.start_val.get()
         end = self.end_val.get()
@@ -126,9 +154,13 @@ class Converter(tk.Frame):
         command.append(str(end - start))
         print(command)
         
-        pass
+    def close(self):
+        self.master.destroy()
+
+def show(start_limit: float, end_limit: float, init_start: float, init_end: int, path: str):
+    root = tk.Tk()
+    d = Converter(root, start_limit, end_limit, init_start, init_end, path)
+    d.mainloop()
 
 if __name__ == '__main__':
-    root = tk.Tk()
-    app = Converter(root, 0, 100, 1, 10, "ffmpeg.exe", "")
-    app.mainloop()
+    show(0, 100, 1, 10, "")

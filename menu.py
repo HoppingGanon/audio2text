@@ -5,10 +5,10 @@ import threading
 import time
 import tkinter as tk
 from tkinter import messagebox
-from tkinter import filedialog
 from analyze import analyze, clear_cache
+import convert
 from open import open_json
-from common import get_ffplay_path
+from common import get_ffplay_path, get_ffmpeg_path, get_ffprobe_path
 from pathlib import Path
 import re
 
@@ -19,9 +19,11 @@ class SearchForm(tk.Frame):
         # キャッシュのクリア
         clear_cache()
 
+        self.ffmpeg_path = get_ffmpeg_path()
         self.ffplay_path = get_ffplay_path()
-        if self.ffplay_path == "":
-            messagebox.showwarning("警告", "ffmpeg.exeがありません。ffmpeg.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
+        self.ffprobe_path = get_ffprobe_path()
+        if self.ffmpeg_path == "" or self.ffplay_path == "" or self.ffprobe_path == "":
+            messagebox.showwarning("警告", "必要なファイルがありません。ffmpeg.exe, ffplay.exe, ffprobe.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
             return
 
         self.search_results = []
@@ -280,18 +282,15 @@ class SearchForm(tk.Frame):
         fullpath = os.path.join(d, r_path)
         self.ffplay(fullpath)
 
-    def play_part(self, event):
-        start_index = int(event.widget._name[len("play_part_button_"):])
-        data = self.result_data[start_index]
-        r_path = data["path"]
-        d = str(Path(self.project_path).parent)
-        fullpath = os.path.join(d, r_path)
-
+    def get_part_time(self, data):
         is_text = data["is_text"]
         start = data["start"]
         end = data["end"]
         json_index = data["json_index"]
         json_data = self.json_data["data"][json_index]
+
+        if start < 0 or end < 0:
+            return 0, data["duration"]
 
         cnt = 0
         start_index = -1
@@ -314,14 +313,23 @@ class SearchForm(tk.Frame):
             if end <= cnt:
                 break
         
-        # 有効な文字列の長さが0だった場合の例外処理
+        # 有効な文字列の長さが0だった場合の処理
         if start_index == -1 or end_index == -1:
-            return
+            return -1, -1
 
         start_sec = json_data["result"][start_index]["start"]
         end_sec = json_data["result"][end_index]["end"]
 
-        self.ffplay(fullpath, start_sec -0.75, end_sec + 0.75)
+        return start_sec, end_sec
+
+    def play_part(self, event):
+        start_index = int(event.widget._name[len("play_part_button_"):])
+        data = self.result_data[start_index]
+        r_path = data["path"]
+        d = str(Path(self.project_path).parent)
+        fullpath = os.path.join(d, r_path)
+        start_sec, end_sec = self.get_part_time(data)
+        self.ffplay(fullpath, start_sec - 0.75, end_sec + 0.75)
     
     def stop(self, event):
         if self.is_playing():
@@ -332,11 +340,14 @@ class SearchForm(tk.Frame):
     
     def save(self, event):
         self.stop(None)
-        file = filedialog.asksaveasfilename(
-            title="ファイル",
-            filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav')],
-            initialfile=".mp3"
-            )
+        start_index = int(event.widget._name[len("save_button_"):])
+        data = self.result_data[start_index]
+        path = data["path"]
+        json_index = data["json_index"]
+        json_data = self.json_data["data"][json_index]
+        duration = json_data["duration"]
+        start_sec, end_sec = self.get_part_time(data)
+        convert.show(0, duration, start_sec, end_sec, path)
         return
         
     def create_command(self, main_command, path, start=-1, end=-1):
