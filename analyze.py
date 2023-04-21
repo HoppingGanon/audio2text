@@ -10,7 +10,7 @@ import string
 import json
 from pykakasi import kakasi
 from pathlib import Path
-from common import get_ffmpeg_path
+from common import get_ffmpeg_path, get_ffprobe_path
 
 def generate_filename(parent_dir, filename_length):
     while True:
@@ -58,14 +58,16 @@ def convert_to_wav(fullname, name, output_folder_path, ffmpeg_path):
 class TextResult():
     path: str
     obj: any
+    duration: float
 
     def __init__(self) -> None:
         self.path = ""
         self.obj = {}
+        self.duration = 0
         pass
 
 
-def get_text(dirName, filename, model, ffmpeg_path, path_reduce_count) -> TextResult:
+def get_text(dirName, filename, model, ffmpeg_path, ffprobe_path, path_reduce_count) -> TextResult:
     r = TextResult()
     lower = filename.lower()
     if lower.endswith(".mp3") or lower.endswith(".wav") or lower.endswith(".aac"):
@@ -78,10 +80,21 @@ def get_text(dirName, filename, model, ffmpeg_path, path_reduce_count) -> TextRe
         wav_file_path = convert_to_wav(org_file_path, filename, output_folder_path, ffmpeg_path)
         r.path = os.path.abspath(org_file_path)[path_reduce_count:]
         r.obj = get_text_wav(wav_file_path, model)
+        r.duration = get_duration(ffprobe_path, wav_file_path)
 
         os.remove(wav_file_path)
 
     return r
+
+def get_duration(ffprobe_path, path):
+    result = subprocess.run([ffprobe_path, path, "-loglevel", "quiet", "-show_streams", "-print_format", "json"], capture_output=True, text=True)
+    data = json.loads(result.stdout)
+
+    duration = data["streams"][0]["duration"]
+    try:
+        return float(duration)
+    except ValueError:
+        return 0
 
 def get_json_name(folder_path, target_path):
     """
@@ -123,6 +136,7 @@ def to_hiragana(text: str):
 
 def analyze(analyze_path: str = "", save_path: str = ""):
     ffmpeg_path = get_ffmpeg_path()
+    ffprobe_path = get_ffprobe_path()
 
     if ffmpeg_path == "":
         messagebox.showwarning("警告", "ffmpeg.exeがありません。ffmpeg.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
@@ -175,13 +189,14 @@ def analyze(analyze_path: str = "", save_path: str = ""):
     # 再帰的に検索
     for dirName, _, fileList in os.walk(root_dir):
         for filename in fileList:
-            r = get_text(dirName, filename, model, ffmpeg_path, len(os.path.abspath(root_dir)) + 1)
+            r = get_text(dirName, filename, model, ffmpeg_path, ffprobe_path, len(os.path.abspath(root_dir)) + 1)
             if r.path != "":
                 data = r.obj
                 del data["text"]
                 for result in data["result"]:
                     result["yomi"] = to_hiragana(result["word"])
                 data["path"] = r.path
+                data["duration"] = r.duration
                 final_results.append(data)
 
     # final_resultsをJSONファイルとして出力

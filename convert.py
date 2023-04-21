@@ -40,8 +40,10 @@ class Converter(tk.Frame):
         self.end_entry.grid(row=1, column=2, padx=5, sticky="ew")
 
         # バインドの設定
-        self.start_val.trace("w", self.update_start_slider_from_entry)
-        self.end_val.trace("w", self.update_end_slider_from_entry)
+        self.start_entry.bind("<Return>", self.update_start_slider_from_entry)
+        self.start_entry.bind("<FocusOut>", self.update_start_slider_from_entry)
+        self.end_entry.bind("<Return>", self.update_end_slider_from_entry)
+        self.end_entry.bind("<FocusOut>", self.update_end_slider_from_entry)
         self.start_slider.bind("<B1-Motion>", self.update_start_entry_from_slider)
         self.end_slider.bind("<B1-Motion>", self.update_end_entry_from_slider)
 
@@ -70,28 +72,27 @@ class Converter(tk.Frame):
             return
         
         self.is_changing = True
-        if not str.isnumeric(self.start_entry_val.get()):
+        try:
+            start_entry_val = float(self.start_entry_val.get())
+            print(start_entry_val)
+            self.start_slider.set(start_entry_val)
+        except ValueError:
+            print("e")
+        finally:
             self.is_changing = False
-            return
-        
-        start_entry_val = float(self.start_entry_val.get())
-        self.start_slider.set(start_entry_val)
-        
-        self.is_changing = False
 
     def update_end_slider_from_entry(self, *args):
         if self.is_changing:
             return
         
         self.is_changing = True
-        if not str.isnumeric(self.end_entry_val.get()):
+        try:
+            end_entry_val = float(self.end_entry_val.get())
+            self.end_slider.set(end_entry_val)
+        except ValueError:
+            pass
+        finally:
             self.is_changing = False
-            return
-        
-        end_entry_val = float(self.end_entry_val.get())
-        self.end_slider.set(end_entry_val)
-        
-        self.is_changing = False
 
     def update_start_entry_from_slider(self, event=None):
         if self.is_changing:
@@ -127,6 +128,7 @@ class Converter(tk.Frame):
         
         pass
 
-root = tk.Tk()
-app = Converter(root, 0, 100, 1, 10, "ffmpeg.exe", "")
-app.mainloop()
+if __name__ == '__main__':
+    root = tk.Tk()
+    app = Converter(root, 0, 100, 1, 10, "ffmpeg.exe", "")
+    app.mainloop()
