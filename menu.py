@@ -28,7 +28,7 @@ class SearchForm(tk.Frame):
 
         # ウィンドウの設定
         self.master = master
-        self.master.title("Search Form")
+        self.master.title("audio2text")
         self.master.geometry("500x400")
 
         # ウィンドウの x ボタンが押された時に呼ばれるメソッドを設定

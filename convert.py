@@ -1,4 +1,3 @@
-import os
 import subprocess
 import tkinter as tk
 from tkinter import filedialog
@@ -8,8 +7,9 @@ from common import create_command, get_ffmpeg_path, get_ffplay_path
 class Converter(tk.Frame):
     def __init__(self, master, start_limit: float, end_limit: float, init_start: float, init_end: float, path: str):
         super().__init__(master)
-        print(start_limit, end_limit, init_start, init_end, path)
         self.master = master
+        self.master.protocol('WM_DELETE_WINDOW', self.close)
+        self.master.title(f"抽出 - {path}")
         self.save_process = None
         self.is_changing = False
         self.start_limit = start_limit
@@ -154,14 +154,17 @@ class Converter(tk.Frame):
             filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav')],
             initialfile="extract.mp3"
             )
+        
+        self.master.lift()
+
+        if save_file == "":
+            return
 
         start = self.start_slider.get()
         end = self.end_slider.get()
         cmd = create_command(self.ffmpeg_path, self.path, start, end)
         cmd.append("-y")
         cmd.append(save_file)
-
-        print(cmd)
 
         p = subprocess.Popen(cmd)
         p.wait()
@@ -185,9 +188,10 @@ class Converter(tk.Frame):
     def close(self):
         self.stop()
         self.master.destroy()
+        self.master.quit()
 
 def show(start_limit: float, end_limit: float, init_start: float, init_end: int, path: str):
-    root = tk.Tk()
+    root = tk.Toplevel()
     d = Converter(root, start_limit, end_limit, init_start, init_end, path)
     d.mainloop()
 

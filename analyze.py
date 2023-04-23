@@ -12,6 +12,9 @@ from pykakasi import kakasi
 from pathlib import Path
 from common import get_ffmpeg_path, get_ffprobe_path
 
+# 読み方変換オブジェクトをインスタンス化
+kakasi = kakasi()
+
 def generate_filename(parent_dir, filename_length):
     while True:
         # ランダムなファイル名を生成
@@ -118,9 +121,6 @@ def get_json_name(folder_path, target_path):
                 return filepath.replace("\\", "/")
             
     return generate_filename(folder_path, 16).replace("\\", "/")
-
-# 読み方変換オブジェクトをインスタンス化
-kakasi = kakasi()
 
 def to_hiragana(text: str):
     # モードの設定：J(Kanji) to H(Hiragana)
