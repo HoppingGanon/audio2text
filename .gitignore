@@ -6,3 +6,6 @@
 /__pycache__
 /_memo.txt
 /test.py
+/build
+/dist
+/.env
