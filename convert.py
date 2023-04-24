@@ -172,6 +172,7 @@ class Converter(tk.Frame):
     
     def play(self):
         # 再生ボタンをクリックした時の処理を実装する
+        self.stop()
         start = self.start_slider.get()
         end = self.end_slider.get()
         cmd = create_command(self.ffplay_path, self.path, start, end)
@@ -182,7 +183,7 @@ class Converter(tk.Frame):
         self.save_process = subprocess.Popen(cmd)
 
     def stop(self):
-        if (not self.save_process is None) and (self.save_process.poll is None):
+        if (not self.save_process is None) and (self.save_process.poll() is None):
             self.save_process.kill()
         
     def close(self):
