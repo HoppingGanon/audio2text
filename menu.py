@@ -1,13 +1,12 @@
-import asyncio
 import os
 import subprocess
-import threading
 import time
 import tkinter as tk
 from tkinter import messagebox
 from analyze import analyze, clear_cache
+import convert
 from open import open_json
-from common import get_ffplay_path
+from common import create_command, get_ffplay_path, get_ffmpeg_path, get_ffprobe_path
 from pathlib import Path
 import re
 
@@ -18,16 +17,18 @@ class SearchForm(tk.Frame):
         # キャッシュのクリア
         clear_cache()
 
+        self.ffmpeg_path = get_ffmpeg_path()
         self.ffplay_path = get_ffplay_path()
-        if self.ffplay_path == "":
-            messagebox.showwarning("警告", "ffmpeg.exeがありません。ffmpeg.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
+        self.ffprobe_path = get_ffprobe_path()
+        if self.ffmpeg_path == "" or self.ffplay_path == "" or self.ffprobe_path == "":
+            messagebox.showwarning("警告", "必要なファイルがありません。ffmpeg.exe, ffplay.exe, ffprobe.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
             return
 
         self.search_results = []
 
         # ウィンドウの設定
         self.master = master
-        self.master.title("Search Form")
+        self.master.title("audio2text")
         self.master.geometry("500x400")
 
         # ウィンドウの x ボタンが押された時に呼ばれるメソッドを設定
@@ -90,8 +91,6 @@ class SearchForm(tk.Frame):
         self.result_data = []
 
         self.playing_process = None
-        self.is_playing = False
-        self.stop_signal = False
 
         self.update_canvas(450)
     
@@ -119,6 +118,7 @@ class SearchForm(tk.Frame):
     def create_project(self):
         path = analyze()
         print("解析が完了しました")
+        messagebox.showinfo("完了", "解析が完了しました")
         if path != "":
             path2, obj = open_json(path)
             if path2 != "":
@@ -152,8 +152,17 @@ class SearchForm(tk.Frame):
             if data["start"] >= 0 and data["end"] >= 0:
                 button = tk.Button(actions_frame, text="部分再生", name=f"play_part_button_{i}")
                 button.bind("<ButtonPress>", self.play_part)
+                button.pack(side=tk.LEFT, padx=2)
+            
+            button = tk.Button(actions_frame, text="停止", name=f"stop_button_{i}")
+            button.bind("<ButtonPress>", self.stop)
             button.pack(side=tk.LEFT, padx=2)
-            button = tk.Button(actions_frame, text="編集(未実装)", command=self.search)
+
+            button = tk.Button(actions_frame, text="編集(未実装)")
+            button.pack(side=tk.LEFT, padx=2)
+            
+            button = tk.Button(actions_frame, text="抽出", name=f"save_button_{i}")
+            button.bind("<ButtonRelease>", self.save)
             button.pack(side=tk.LEFT, padx=2)
             
             r = i*4+1
@@ -204,6 +213,7 @@ class SearchForm(tk.Frame):
 
     def search(self):
         # 検索ボタンが押された時に呼ばれる関数
+        self.stop(None)
 
         prefix_count = 20
         suffix_count = 20
@@ -272,18 +282,15 @@ class SearchForm(tk.Frame):
         fullpath = os.path.join(d, r_path)
         self.ffplay(fullpath)
 
-    def play_part(self, event):
-        start_index = int(event.widget._name[len("play_part_button_"):])
-        data = self.result_data[start_index]
-        r_path = data["path"]
-        d = str(Path(self.project_path).parent)
-        fullpath = os.path.join(d, r_path)
-
+    def get_part_time(self, data):
         is_text = data["is_text"]
         start = data["start"]
         end = data["end"]
         json_index = data["json_index"]
         json_data = self.json_data["data"][json_index]
+
+        if start < 0 or end < 0:
+            return 0, data["duration"]
 
         cnt = 0
         start_index = -1
@@ -306,75 +313,65 @@ class SearchForm(tk.Frame):
             if end <= cnt:
                 break
         
-        # 有効な文字列の長さが0だった場合の例外処理
+        # 有効な文字列の長さが0だった場合の処理
         if start_index == -1 or end_index == -1:
-            return
+            return -1, -1
 
         start_sec = json_data["result"][start_index]["start"]
         end_sec = json_data["result"][end_index]["end"]
 
-        self.ffplay(fullpath, start_sec -0.75, end_sec + 0.75)
-        
-    def create_command(self, main_command, path, start=-1, end=-1):
-        cmd = []
-        cmd.append(main_command)
-        if start >= 0:
-            cmd.append("-ss")
-            cmd.append(str(start))
-        else:
-            start = 0
-        if end >= 0:
-            cmd.append("-t")
-            cmd.append(str(end - start))
-        
-        cmd.append("-i")
-        cmd.append(path)
+        return start_sec, end_sec
 
-        return cmd
+    def play_part(self, event):
+        start_index = int(event.widget._name[len("play_part_button_"):])
+        data = self.result_data[start_index]
+        r_path = data["path"]
+        d = str(Path(self.project_path).parent)
+        fullpath = os.path.join(d, r_path)
+        start_sec, end_sec = self.get_part_time(data)
+        self.ffplay(fullpath, start_sec - 0.75, end_sec + 0.75)
+    
+    def stop(self, event):
+        if self.is_playing():
+            self.playing_process.kill()
+    
+    def is_playing(self):
+        return (not self.playing_process is None) and self.playing_process.poll() is None
+    
+    def save(self, event):
+        self.stop(None)
+        start_index = int(event.widget._name[len("save_button_"):])
+        data = self.result_data[start_index]
+        r_path = data["path"]
+        d = str(Path(self.project_path).parent)
+        fullpath = os.path.join(d, r_path)
+        json_index = data["json_index"]
+        json_data = self.json_data["data"][json_index]
+        duration = json_data["duration"]
+        start_sec, end_sec = self.get_part_time(data)
+        convert.show(0, duration, start_sec, end_sec, fullpath)
+        return
 
     def ffplay(self, path, start=-1, end=-1):
-        # 終了要求中なら処理をキャンセル
-        if self.stop_signal:
-            return
-        
         # 再生中なら強制停止
-        if self.is_playing:
-            self.stop_signal = True
+        if self.is_playing():
+            self.stop(None)
             time.sleep(0.15)
 
-        cmd = self.create_command(self.ffplay_path, path, start, end)
+        cmd = create_command(self.ffplay_path, path, start, end)
         cmd.append("-vn")
         cmd.append("-showmode")
         cmd.append("0")
         cmd.append("-autoexit")
 
-        self.playing_process = threading.Thread(target=lambda: asyncio.run(self.exec_command(cmd)))
-        self.playing_process.start()
-    
-    async def exec_command(self, cmd):
-        p = subprocess.Popen(cmd)
-        self.is_playing = True
-        while True:
-            if self.stop_signal:
-                p.kill()
-                self.is_playing = False
-                time.sleep(0.075)
-                self.stop_signal = False
-                return
-            elif not p.poll() is None:
-                self.is_playing = False
-                self.stop_signal = False
-                return
-            else:
-                self.is_playing = True
-            time.sleep(0.05)
-            print('')
+        self.playing_process = subprocess.Popen(cmd)
 
     def click_close(self):
-        self.stop_signal = True
-        if True or messagebox.askokcancel("確認", "終了しますか？"):
+        self.stop(None)
+        if messagebox.askokcancel("確認", "終了しますか？"):
             clear_cache()
             self.master.destroy()
+            self.master.quit()
 
 if __name__ == "__main__":
     root = tk.Tk()
