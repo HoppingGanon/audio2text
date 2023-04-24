@@ -118,6 +118,7 @@ class SearchForm(tk.Frame):
     def create_project(self):
         path = analyze()
         print("解析が完了しました")
+        messagebox.showinfo("完了", "解析が完了しました")
         if path != "":
             path2, obj = open_json(path)
             if path2 != "":
@@ -367,9 +368,10 @@ class SearchForm(tk.Frame):
 
     def click_close(self):
         self.stop(None)
-        if True or messagebox.askokcancel("確認", "終了しますか？"):
+        if messagebox.askokcancel("確認", "終了しますか？"):
             clear_cache()
             self.master.destroy()
+            self.master.quit()
 
 if __name__ == "__main__":
     root = tk.Tk()
