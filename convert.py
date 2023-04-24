@@ -2,7 +2,7 @@ import subprocess
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
-from common import create_command, get_ffmpeg_path, get_ffplay_path
+from common import create_command, get_ffmpeg_path, get_ffplay_path, load_settings
 
 class Converter(tk.Frame):
     def __init__(self, master, start_limit: float, end_limit: float, init_start: float, init_end: float, path: str):
@@ -10,6 +10,8 @@ class Converter(tk.Frame):
         self.master = master
         self.master.protocol('WM_DELETE_WINDOW', self.close)
         self.master.title(f"抽出 - {path}")
+
+        self.settings = load_settings()
         self.save_process = None
         self.is_changing = False
         self.start_limit = start_limit
@@ -151,7 +153,7 @@ class Converter(tk.Frame):
 
         save_file = filedialog.asksaveasfilename(
             title="ファイル",
-            filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav')],
+            filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav'), ('その他のファイル', '*.*')],
             initialfile="extract.mp3"
             )
         
@@ -163,6 +165,13 @@ class Converter(tk.Frame):
         start = self.start_slider.get()
         end = self.end_slider.get()
         cmd = create_command(self.ffmpeg_path, self.path, start, end)
+
+        cmd.append("-b:a")
+        self.settings["audio_bit_rate"]
+        cmd.append("-r:a")
+        self.settings["audio_sampling_rate"]
+        cmd += self.settings["additional_args"]
+
         cmd.append("-y")
         cmd.append(save_file)
 
@@ -175,7 +184,7 @@ class Converter(tk.Frame):
         self.stop()
         start = self.start_slider.get()
         end = self.end_slider.get()
-        cmd = create_command(self.ffplay_path, self.path, start, end)
+        cmd = create_command(self.ffplay_path, self.path, start, end, ["-loop", "-1"])
         cmd.append("-vn")
         cmd.append("-showmode")
         cmd.append("0")

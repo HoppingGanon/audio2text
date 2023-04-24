@@ -117,8 +117,6 @@ class SearchForm(tk.Frame):
     # 新規解析コマンドの関数
     def create_project(self):
         path = analyze()
-        print("解析が完了しました")
-        messagebox.showinfo("完了", "解析が完了しました")
         if path != "":
             path2, obj = open_json(path)
             if path2 != "":
@@ -126,6 +124,8 @@ class SearchForm(tk.Frame):
                 self.json_data = obj
                 self.set_all_result()
                 self.update_canvas()
+                print("解析が完了しました")
+                messagebox.showinfo("完了", "解析が完了しました")
 
     def update_canvas(self, width = 0):
         if width == 0:

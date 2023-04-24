@@ -10,7 +10,7 @@ import string
 import json
 from pykakasi import kakasi
 from pathlib import Path
-from common import get_ffmpeg_path, get_ffprobe_path
+from common import get_ffmpeg_path, get_ffprobe_path, load_settings, include_ext
 
 # 読み方変換オブジェクトをインスタンス化
 kakasi = kakasi()
@@ -27,11 +27,11 @@ def generate_filename(parent_dir, filename_length):
         if not os.path.isfile(full_name):
             return full_name
 
-def get_text_wav(filePath, model):
+def get_text_wav(org_path, path, model):
     # 音声ファイルの読み込み
-    wf = wave.open(filePath, "rb")
+    wf = wave.open(path, "rb")
     if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-        messagebox("警告", "入力可能な音声ファイルはMP3ファイルまたはモノラルリニアPCMのWAVサウンドのみです")
+        messagebox("警告", "入力可能な音声ファイルはモノラル・リニアPCMのWAVサウンドのみです")
         return
 
     # VOSKでの音声認識
@@ -48,13 +48,13 @@ def get_text_wav(filePath, model):
     result = json.loads(rec.FinalResult())
 
     wf.close()
-    print(f"'{filePath}'の解析を完了しました")
+    print(f"'{org_path}'の解析を完了しました")
     return result
 
 
 def convert_to_wav(fullname, name, output_folder_path, ffmpeg_path):
     wav_file_path = os.path.join(output_folder_path, f"{name}.wav")
-    subprocess.call([ffmpeg_path, "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-loglevel", "quiet", "-y", wav_file_path])
+    subprocess.call([ffmpeg_path, "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "48000", "-ac", "1", "-loglevel", "quiet", "-y", wav_file_path])
     return wav_file_path
 
 
@@ -69,20 +69,20 @@ class TextResult():
         self.duration = 0
         pass
 
-
-def get_text(dirName, filename, model, ffmpeg_path, ffprobe_path, path_reduce_count) -> TextResult:
+def get_text(dirName, filename, model, ffmpeg_path, ffprobe_path, path_reduce_count, target_ext) -> TextResult:
     r = TextResult()
     lower = filename.lower()
-    if lower.endswith(".mp3") or lower.endswith(".wav") or lower.endswith(".aac"):
+    
+    if include_ext(lower, target_ext):
         org_file_path = os.path.join(dirName, filename).replace("\\", "/")
-        output_folder_path = os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "audio2text", "cache").replace("\\", "/")
+        output_folder_path = os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "soundgrep", "cache").replace("\\", "/")
 
         if not os.path.exists(output_folder_path):
             os.makedirs(output_folder_path)
 
         wav_file_path = convert_to_wav(org_file_path, filename, output_folder_path, ffmpeg_path)
         r.path = os.path.abspath(org_file_path)[path_reduce_count:]
-        r.obj = get_text_wav(wav_file_path, model)
+        r.obj = get_text_wav(org_file_path, wav_file_path, model)
         r.duration = get_duration(ffprobe_path, wav_file_path)
 
         os.remove(wav_file_path)
@@ -135,6 +135,8 @@ def to_hiragana(text: str):
     return conv.do(s)
 
 def analyze(analyze_path: str = "", save_path: str = ""):
+    settings = load_settings()
+
     ffmpeg_path = get_ffmpeg_path()
     ffprobe_path = get_ffprobe_path()
 
@@ -189,7 +191,7 @@ def analyze(analyze_path: str = "", save_path: str = ""):
     # 再帰的に検索
     for dirName, _, fileList in os.walk(root_dir):
         for filename in fileList:
-            r = get_text(dirName, filename, model, ffmpeg_path, ffprobe_path, len(os.path.abspath(root_dir)) + 1)
+            r = get_text(dirName, filename, model, ffmpeg_path, ffprobe_path, len(os.path.abspath(root_dir)) + 1, settings["target_ext"])
             if r.path != "":
                 data = r.obj
                 del data["text"]
@@ -210,7 +212,9 @@ def analyze(analyze_path: str = "", save_path: str = ""):
     return json_path
 
 def clear_cache():
-    cache_path = os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "audio2text", "cache")
+    cache_path = os.path.join(os.environ["LOCALAPPDATA"], "HoppingGanon", "soundgrep", "cache")
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path)
     for filename in os.listdir(cache_path):
         file_path = os.path.join(cache_path, filename)
         try:
