@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tkinter as tk
 from tkinter import filedialog
@@ -167,17 +168,28 @@ class Converter(tk.Frame):
         cmd = create_command(self.ffmpeg_path, self.path, start, end)
 
         cmd.append("-b:a")
-        self.settings["audio_bit_rate"]
+        cmd.append(self.settings["audio_bit_rate"])
         cmd.append("-r:a")
-        self.settings["audio_sampling_rate"]
+        cmd.append(self.settings["audio_sampling_rate"])
         cmd += self.settings["additional_args"]
 
         cmd.append("-y")
         cmd.append(save_file)
 
+        print(str.join(" ", cmd))
         p = subprocess.Popen(cmd)
-        p.wait()
-        messagebox.showinfo("完了" ,f"抽出した音声を'{save_file}'に保存しました")
+        code = p.wait()
+
+        if code == 0:
+            messagebox.showinfo("完了" ,f"抽出した音声を'{save_file}'に保存しました")
+        else:
+            messagebox.showerror("失敗" ,f"'{save_file}'の保存に失敗しました")
+            try:
+                os.remove(save_file)
+            except:
+                pass
+        
+        self.master.lift()
     
     def play(self):
         # 再生ボタンをクリックした時の処理を実装する

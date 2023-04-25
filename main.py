@@ -2,6 +2,7 @@ import os
 import subprocess
 import time
 import tkinter as tk
+import tkinter.ttk as ttk
 from tkinter import messagebox
 from analyze import analyze, clear_cache
 import convert
@@ -46,7 +47,7 @@ class SearchForm(tk.Frame):
 
         # チェックボックスの作成 ----------------------------
         self.check_frame = tk.Frame(self)
-        self.check_frame.pack(side=tk.TOP, padx=3, pady=10, anchor="w")
+        self.check_frame.pack(side=tk.TOP, padx=3, pady=3, anchor="w")
 
         self.disp_fname_val = tk.BooleanVar()
         self.disp_fname_val.set(True)
@@ -62,17 +63,36 @@ class SearchForm(tk.Frame):
         self.disp_kana.pack(side=tk.LEFT)
 
         # 検索フレームの作成 ----------------------------
-        self.search_frame = tk.Frame(self)
-        self.search_frame.pack(side=tk.TOP, padx=3, pady=5, anchor="w")
+        self.search_frame = tk.Frame(self, relief="solid")
+        self.search_frame.pack(side=tk.TOP, padx=3, pady=5, anchor="w", fill=tk.BOTH, expand=True)
         # ラベルの作成
         self.label = tk.Label(self.search_frame, text="Search:")
         self.label.pack(side=tk.LEFT)
         # エントリーの作成
-        self.entry = tk.Entry(self.search_frame, width=50)
-        self.entry.pack(side=tk.LEFT, padx=2)
-        # 検索ボタンの作成
+        self.entry = tk.Entry(self.search_frame)
+        self.entry.pack(side=tk.LEFT, padx=2, fill = tk.X, expand=True)
+
+        # 検索ボタンフの作成
         self.button = tk.Button(self.search_frame, text="検索", command=self.search)
-        self.button.pack(side=tk.LEFT)
+        self.button.pack(side=tk.RIGHT, padx=5)
+
+        # 検索結果のページ選択用フレームの作成 ----------------------------
+        self.page_frame = tk.Frame(self)
+        self.page_frame.pack(side=tk.TOP, padx=3, pady=10, anchor="ne")
+
+        # 1ページ当たりの表示数
+        self.per_page = 100
+        self.page = 0
+
+        # ページのコンボボックスを作成
+        self.page_selector = ttk.Combobox(self.page_frame, state="readonly", values=['設定なし'])
+        self.page_selector.pack(side=tk.RIGHT, padx=5)
+        self.page_selector.set("設定なし")
+
+        # データの定義 ----------------------------
+        self.project_path = ""
+        self.json_data = {}
+        self.json_data["data"] = []
 
         # キャンバスの作成 ----------------------------
         self.canvas = tk.Canvas(self, bg="white", height=300, width=450, scrollregion=(0, 0, 500, 600))
@@ -84,15 +104,27 @@ class SearchForm(tk.Frame):
         self.create_result_frame()
         self.canvas.pack(side="left", fill="both", expand=True)
 
-        self.project_path = ""
-        self.json_data = {}
-        self.json_data["data"] = []
-
+        # 検索結果の配列
         self.result_data = []
+        self.display_data = []
 
+        # 再生処理
         self.playing_process = None
 
         self.update_canvas(450)
+
+    def update_page_selector(self):
+        self.page_selector.destroy()
+        pages = []
+        for i in range(10):
+            pages.append(str(i))
+        self.page_selector = ttk.Combobox(self.page_frame, state="readonly", values=pages)
+        self.page_selector.pack(side=tk.RIGHT, padx=5)
+        self.page_selector.set(0)
+        self.page_selector.bind("<<ComboboxSelected>>", self.change_page)
+
+    def change_page(self, *args):
+        print("hit")
     
     def create_result_frame(self):
         # キャンバスの作成
@@ -111,7 +143,9 @@ class SearchForm(tk.Frame):
         if path != "":
             self.project_path = path
             self.json_data = obj
+            self.update_page_selector()
             self.set_all_result()
+            self.create_display()
             self.update_canvas()
 
     # 新規解析コマンドの関数
@@ -122,7 +156,9 @@ class SearchForm(tk.Frame):
             if path2 != "":
                 self.project_path = path2
                 self.json_data = obj
+                self.update_page_selector()
                 self.set_all_result()
+                self.create_display()
                 self.update_canvas()
                 print("解析が完了しました")
                 messagebox.showinfo("完了", "解析が完了しました")
@@ -140,12 +176,13 @@ class SearchForm(tk.Frame):
             return
 
         # フレーム内にグリッドレイアウトを作成
-        for i, data in enumerate(self.result_data):
+        for i, data in enumerate(self.display_data):
             r = i*4
             self.result_frame.rowconfigure(r, weight=1)
             self.result_frame.columnconfigure(1, weight=1)
             actions_frame=tk.Frame(self.result_frame)
             actions_frame.grid(row=r, column=1, columnspan=2, pady=5, sticky="ew")
+            
             button = tk.Button(actions_frame, text="再生", name=f"play_button_{i}")
             button.bind("<ButtonPress>", self.play_all)
             button.pack(side=tk.LEFT, padx=2)
@@ -208,13 +245,23 @@ class SearchForm(tk.Frame):
             self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def set_all_result(self):
-        for data in self.json_data["data"]:
+        for index, data in enumerate(self.json_data["data"]):
             self.result_data.append(data)
 
     def search(self):
         # 検索ボタンが押された時に呼ばれる関数
         self.stop(None)
+        self.update_page_selector()
+        self.create_result()
+        self.create_display()
 
+    def create_display(self):
+        self.display_data.clear()
+        for index, data in enumerate(self.result_data):
+            if self.page * self.per_page <= index < (self.page + 1) * self.per_page:
+                self.display_data.append(data)
+
+    def create_result(self):
         prefix_count = 20
         suffix_count = 20
 
@@ -277,7 +324,7 @@ class SearchForm(tk.Frame):
 
     def play_all(self, event):
         index = int(event.widget._name[len("play_button_"):])
-        r_path = self.result_data[index]["path"]
+        r_path = self.display_data[index]["path"]
         d = str(Path(self.project_path).parent)
         fullpath = os.path.join(d, r_path)
         self.ffplay(fullpath)
@@ -324,7 +371,7 @@ class SearchForm(tk.Frame):
 
     def play_part(self, event):
         start_index = int(event.widget._name[len("play_part_button_"):])
-        data = self.result_data[start_index]
+        data = self.display_data[start_index]
         r_path = data["path"]
         d = str(Path(self.project_path).parent)
         fullpath = os.path.join(d, r_path)
@@ -341,7 +388,7 @@ class SearchForm(tk.Frame):
     def save(self, event):
         self.stop(None)
         start_index = int(event.widget._name[len("save_button_"):])
-        data = self.result_data[start_index]
+        data = self.display_data[start_index]
         r_path = data["path"]
         d = str(Path(self.project_path).parent)
         fullpath = os.path.join(d, r_path)

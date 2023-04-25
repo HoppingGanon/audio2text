@@ -25,7 +25,7 @@ def open_json(path: str = ""):
     for index, d in enumerate(data["data"]):
         text_sb.clear()
         yomi_sb.clear()
-        if "result" in data:
+        if "result" in d:
             for r in d["result"]:
                 text_sb.append(r["word"])
                 yomi_sb.append(r["yomi"])
