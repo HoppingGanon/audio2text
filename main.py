@@ -251,15 +251,18 @@ class SearchForm(tk.Frame):
     def search(self):
         # 検索ボタンが押された時に呼ばれる関数
         self.stop(None)
-        self.update_page_selector()
         self.create_result()
         self.create_display()
+        self.update_page_selector()
 
     def create_display(self):
         self.display_data.clear()
         for index, data in enumerate(self.result_data):
             if self.page * self.per_page <= index < (self.page + 1) * self.per_page:
                 self.display_data.append(data)
+
+        self.update_idletasks()
+        self.update_canvas()
 
     def create_result(self):
         prefix_count = 20
@@ -283,6 +286,8 @@ class SearchForm(tk.Frame):
                 path: str = data["path"]
 
                 loop = True
+
+                base_position = 0
                 while loop:
                     # textから検索
                     m = re.search(pattern, target)
@@ -314,13 +319,13 @@ class SearchForm(tk.Frame):
                         result["yomi"] = result_text
                     
                     result["is_text"] = is_text
-                    result["start"] = start
-                    result["end"] = end
+                    result["start"] = start + base_position
+                    result["end"] = end + base_position
                     result["json_index"] = json_index
                     self.result_data.append(result)
 
-        self.update_idletasks()
-        self.update_canvas()
+                    base_position += end + 1
+
 
     def play_all(self, event):
         index = int(event.widget._name[len("play_button_"):])
@@ -340,30 +345,31 @@ class SearchForm(tk.Frame):
             return 0, data["duration"]
 
         cnt = 0
-        start_index = -1
+        start_index = 0
         for r in json_data["result"]:
             if is_text:
                 cnt += len(r["word"])
             else:
                 cnt += len(r["yomi"])
-            start_index += 1
-            if start <= cnt:
+            if start < cnt:
                 break
+            start_index += 1
+        
         cnt = 0
-        end_index = -1
+        end_index = 0
         for r in json_data["result"]:
             if is_text:
                 cnt += len(r["word"])
             else:
                 cnt += len(r["yomi"])
-            end_index += 1
             if end <= cnt:
                 break
+            end_index += 1
         
         # 有効な文字列の長さが0だった場合の処理
         if start_index == -1 or end_index == -1:
             return -1, -1
-
+        
         start_sec = json_data["result"][start_index]["start"]
         end_sec = json_data["result"][end_index]["end"]
 
