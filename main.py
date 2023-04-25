@@ -71,8 +71,9 @@ class SearchForm(tk.Frame):
         # エントリーの作成
         self.entry = tk.Entry(self.search_frame)
         self.entry.pack(side=tk.LEFT, padx=2, fill = tk.X, expand=True)
+        self.entry.bind("<Return>", self.search)
 
-        # 検索ボタンフの作成
+        # 検索ボタンの作成
         self.button = tk.Button(self.search_frame, text="検索", command=self.search)
         self.button.pack(side=tk.RIGHT, padx=5)
 
@@ -248,7 +249,7 @@ class SearchForm(tk.Frame):
         for index, data in enumerate(self.json_data["data"]):
             self.result_data.append(data)
 
-    def search(self):
+    def search(self, event = None):
         # 検索ボタンが押された時に呼ばれる関数
         self.stop(None)
         self.create_result()
