@@ -117,15 +117,27 @@ class SearchForm(tk.Frame):
     def update_page_selector(self):
         self.page_selector.destroy()
         pages = []
-        for i in range(10):
-            pages.append(str(i))
+
+        page_max = int((len(self.result_data) - 1) / self.per_page) + 1
+        for i in range(page_max):
+            from_ = i * self.per_page + 1
+            if i == page_max - 1:
+                to = len(self.result_data)
+            else:
+                to = (i + 1) * self.per_page
+            item = f"{str(from_)}～{str(to)}件目"
+            pages.append(item)
+        
         self.page_selector = ttk.Combobox(self.page_frame, state="readonly", values=pages)
+        self.page_selector.set(pages[0])
         self.page_selector.pack(side=tk.RIGHT, padx=5)
-        self.page_selector.set(0)
         self.page_selector.bind("<<ComboboxSelected>>", self.change_page)
 
     def change_page(self, *args):
-        print("hit")
+        self.stop(None)
+        self.page = self.page_selector.current()
+        self.create_result()
+        self.create_display()
     
     def create_result_frame(self):
         # キャンバスの作成
@@ -144,10 +156,10 @@ class SearchForm(tk.Frame):
         if path != "":
             self.project_path = path
             self.json_data = obj
-            self.update_page_selector()
             self.set_all_result()
             self.create_display()
             self.update_canvas()
+            self.update_page_selector()
 
     # 新規解析コマンドの関数
     def create_project(self):
@@ -157,10 +169,10 @@ class SearchForm(tk.Frame):
             if path2 != "":
                 self.project_path = path2
                 self.json_data = obj
-                self.update_page_selector()
                 self.set_all_result()
                 self.create_display()
                 self.update_canvas()
+                self.update_page_selector()
                 print("解析が完了しました")
                 messagebox.showinfo("完了", "解析が完了しました")
 
