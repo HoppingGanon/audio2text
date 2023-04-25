@@ -195,8 +195,9 @@ def analyze(analyze_path: str = "", save_path: str = ""):
             if r.path != "":
                 data = r.obj
                 del data["text"]
-                for result in data["result"]:
-                    result["yomi"] = to_hiragana(result["word"])
+                if "result" in data:
+                    for result in data["result"]:
+                        result["yomi"] = to_hiragana(result["word"])
                 data["path"] = r.path
                 data["duration"] = r.duration
                 final_results.append(data)
