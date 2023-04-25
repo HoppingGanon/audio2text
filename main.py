@@ -7,7 +7,7 @@ from tkinter import messagebox
 from analyze import analyze, clear_cache
 import convert
 from open import open_json
-from common import create_command, get_ffplay_path, get_ffmpeg_path, get_ffprobe_path
+from common import create_command, get_ffplay_path, get_ffmpeg_path, get_ffprobe_path, load_settings
 from pathlib import Path
 import re
 
@@ -24,6 +24,8 @@ class SearchForm(tk.Frame):
         if self.ffmpeg_path == "" or self.ffplay_path == "" or self.ffprobe_path == "":
             messagebox.showwarning("警告", "必要なファイルがありません。ffmpeg.exe, ffplay.exe, ffprobe.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
             return
+        
+        self.settings = load_settings()
 
         self.search_results = []
 
