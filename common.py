@@ -40,12 +40,12 @@ def create_command(main_command, path, start=-1, end=-1, pre_args = []):
     cmd += pre_args
     if start >= 0:
         cmd.append("-ss")
-        cmd.append(str(start))
+        cmd.append("{:.3f}".format(start))
     else:
         start = 0
     if end >= 0:
         cmd.append("-t")
-        cmd.append(str(end - start))
+        cmd.append("{:.3f}".format(end - start))
     
     cmd.append("-i")
     cmd.append(path)

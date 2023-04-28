@@ -62,9 +62,18 @@ class Converter(tk.Frame):
         self.start_slider.bind("<B1-Motion>", self.update_start_entry_from_slider)
         self.end_slider.bind("<B1-Motion>", self.update_end_entry_from_slider)
 
-        # ボタンのフォーム
+        # ボタンのフレーム
+        self.settings_frame = tk.Frame(self.master)
+        self.settings_frame.grid(row=2, column=0, columnspan=3, padx=3, pady=3, sticky="ew")
+
+        self.show_preview_val = tk.BooleanVar()
+        self.show_preview_val.set(False)
+        self.show_preview = tk.Checkbutton(self.settings_frame, text="プレビューウィンドウを表示", variable=self.show_preview_val)
+        self.show_preview.pack(side=tk.LEFT)
+
+        # ボタンのフレーム
         self.button_frame = tk.Frame(self.master)
-        self.button_frame.grid(row=2, column=1, columnspan=2, padx=3, pady=3, sticky="ew")
+        self.button_frame.grid(row=3, column=0, columnspan=3, padx=3, pady=3, sticky="ew")
 
         # キャンセルボタン
         self.cancel_button = tk.Button(self.button_frame, text="キャンセル", command=self.close)
@@ -197,9 +206,10 @@ class Converter(tk.Frame):
         start = self.start_slider.get()
         end = self.end_slider.get()
         cmd = create_command(self.ffplay_path, self.path, start, end, ["-loop", "-1"])
-        cmd.append("-vn")
-        cmd.append("-showmode")
-        cmd.append("0")
+        if not self.show_preview_val.get():
+            cmd.append("-vn")
+            cmd.append("-showmode")
+            cmd.append("0")
         cmd.append("-autoexit")
         self.save_process = subprocess.Popen(cmd)
 

@@ -1,5 +1,6 @@
 import os
 import subprocess
+import time
 import wave
 import json
 import vosk
@@ -35,14 +36,26 @@ def get_text_wav(org_path, path, model):
         return
 
     # VOSKでの音声認識
+    print(f"'{org_path}'の解析を開始しました")
+    vosk.SetLogLevel(-1)
     rec = vosk.KaldiRecognizer(model, wf.getframerate())
     rec.SetWords(True)
 
+    i = 1
+    real_start_time = time.time()
+    real_part_time = real_start_time
     while True:
-        data = wf.readframes(4000)
+        data = wf.readframes(16000)
         if len(data) == 0:
             break
         rec.AcceptWaveform(data)
+        if i % 60 == 0:
+            persent = "{:.1f}".format((i * 16000) / wf.getnframes() * 100)
+            per_sec = "{:.1f}".format(60 / (time.time() - real_part_time))
+            span = "{:.1f}".format((time.time() - real_start_time))
+            real_part_time = time.time()
+            print(f"{span}秒経過 {i}秒分({persent}%)処理完了 [{per_sec}倍速]")
+        i += 1
 
     # 認識結果をfinal_resultsに追加
     result = json.loads(rec.FinalResult())
@@ -54,7 +67,7 @@ def get_text_wav(org_path, path, model):
 
 def convert_to_wav(fullname, name, output_folder_path, ffmpeg_path):
     wav_file_path = os.path.join(output_folder_path, f"{name}.wav")
-    subprocess.call([ffmpeg_path, "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "48000", "-ac", "1", "-loglevel", "quiet", "-y", wav_file_path])
+    subprocess.call([ffmpeg_path, "-i", fullname, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "-loglevel", "quiet", "-y", wav_file_path])
     return wav_file_path
 
 

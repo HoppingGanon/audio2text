@@ -426,7 +426,7 @@ class SearchForm(tk.Frame):
             self.stop(None)
             time.sleep(0.15)
 
-        cmd = create_command(self.ffplay_path, path, start, end)
+        cmd = create_command(self.ffplay_path, path, start, end, ["-loop", "-1"])
         cmd.append("-vn")
         cmd.append("-showmode")
         cmd.append("0")
