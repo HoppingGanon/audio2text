@@ -1,6 +1,6 @@
 import json
 import tkinter as tk
-import subprocess
+import webbrowser
 
 def show():
     # Tkinterウィンドウの作成
@@ -48,8 +48,12 @@ def show():
     frame2.pack(side=tk.TOP, padx=3, pady=3, anchor="n")
 
     # ボタンの作成と配置
+    def open_url():
+        webbrowser.open("https://github.com/HoppingGanon/audio2text")
+    button = tk.Button(frame2, text="GitHubを開く", command=open_url)
+    button.pack(side=tk.LEFT, padx=3)
     button = tk.Button(frame2, text="ライセンスファイルを開く", command=show_my_license)
-    button.pack(side=tk.TOP)
+    button.pack(side=tk.LEFT, padx=3)
 
     # リストボックスの作成
     frame = tk.Frame(root)
@@ -59,7 +63,7 @@ def show():
     listbox.pack(pady=5)
 
     # JSONファイルからライセンス情報を読み込む
-    with open("./licenses.json") as f:
+    with open("licenses.json", encoding="utf-8") as f:
         licenses = json.load(f)
 
     # "licenses"の中身をリストで表現

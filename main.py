@@ -11,6 +11,7 @@ from common import create_command, get_ffplay_path, get_ffmpeg_path, get_ffprobe
 from pathlib import Path
 import re
 from licenses import show as show_licenses
+import webbrowser
 
 class SearchForm(tk.Frame):
     def __init__(self, master=None):
@@ -48,7 +49,7 @@ class SearchForm(tk.Frame):
         menubar.add_cascade(label="ファイル", menu=file_menu)
 
         help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="使い方")
+        help_menu.add_command(label="使い方", command=self.go_how_to)
         help_menu.add_command(label="このアプリについて", command=self.show_about) 
         menubar.add_cascade(label="ヘルプ", menu=help_menu)
         self.master.config(menu=menubar)
@@ -121,6 +122,9 @@ class SearchForm(tk.Frame):
         self.playing_process = None
 
         self.update_canvas(450)
+
+    def go_how_to(self):
+        webbrowser.open("https://github.com/HoppingGanon/audio2text")
 
     def show_about(self):
         show_licenses()
