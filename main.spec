@@ -11,6 +11,8 @@ a = Analysis(
     datas=[
         ('./.env/Lib/site-packages/vosk', './vosk'),
         ('./.env/Lib/site-packages/pykakasi', './pykakasi'),
+        ('./licenses.json', '.'),
+        ('./LICENSE', '.'),
     ],
     hiddenimports=[
         'vosk',
