@@ -25,9 +25,10 @@ def open_json(path: str = ""):
     for index, d in enumerate(data["data"]):
         text_sb.clear()
         yomi_sb.clear()
-        for r in d["result"]:
-            text_sb.append(r["word"])
-            yomi_sb.append(r["yomi"])
+        if "result" in d:
+            for r in d["result"]:
+                text_sb.append(r["word"])
+                yomi_sb.append(r["yomi"])
         d["text"] = "".join(text_sb).replace(" ", "")
         d["yomi"] = "".join(yomi_sb).replace(" ", "")
         # 検索状態がテキスト検索

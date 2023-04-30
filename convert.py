@@ -1,8 +1,9 @@
+import os
 import subprocess
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
-from common import create_command, get_ffmpeg_path, get_ffplay_path
+from common import create_command, get_ffmpeg_path, get_ffplay_path, load_settings
 
 class Converter(tk.Frame):
     def __init__(self, master, start_limit: float, end_limit: float, init_start: float, init_end: float, path: str):
@@ -10,6 +11,8 @@ class Converter(tk.Frame):
         self.master = master
         self.master.protocol('WM_DELETE_WINDOW', self.close)
         self.master.title(f"抽出 - {path}")
+
+        self.settings = load_settings()
         self.save_process = None
         self.is_changing = False
         self.start_limit = start_limit
@@ -59,9 +62,18 @@ class Converter(tk.Frame):
         self.start_slider.bind("<B1-Motion>", self.update_start_entry_from_slider)
         self.end_slider.bind("<B1-Motion>", self.update_end_entry_from_slider)
 
-        # ボタンのフォーム
+        # ボタンのフレーム
+        self.settings_frame = tk.Frame(self.master)
+        self.settings_frame.grid(row=2, column=0, columnspan=3, padx=3, pady=3, sticky="ew")
+
+        self.show_preview_val = tk.BooleanVar()
+        self.show_preview_val.set(False)
+        self.show_preview = tk.Checkbutton(self.settings_frame, text="プレビューウィンドウを表示", variable=self.show_preview_val)
+        self.show_preview.pack(side=tk.LEFT)
+
+        # ボタンのフレーム
         self.button_frame = tk.Frame(self.master)
-        self.button_frame.grid(row=2, column=1, columnspan=2, padx=3, pady=3, sticky="ew")
+        self.button_frame.grid(row=3, column=0, columnspan=3, padx=3, pady=3, sticky="ew")
 
         # キャンセルボタン
         self.cancel_button = tk.Button(self.button_frame, text="キャンセル", command=self.close)
@@ -151,7 +163,7 @@ class Converter(tk.Frame):
 
         save_file = filedialog.asksaveasfilename(
             title="ファイル",
-            filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav')],
+            filetypes=[('MP3ファイル','*.mp3'), ('AACファイル','*.aac'), ('WAVEサウンド','*.wav'), ('その他のファイル', '*.*')],
             initialfile="extract.mp3"
             )
         
@@ -163,22 +175,41 @@ class Converter(tk.Frame):
         start = self.start_slider.get()
         end = self.end_slider.get()
         cmd = create_command(self.ffmpeg_path, self.path, start, end)
+
+        cmd.append("-b:a")
+        cmd.append(self.settings["audio_bit_rate"])
+        cmd.append("-r:a")
+        cmd.append(self.settings["audio_sampling_rate"])
+        cmd += self.settings["additional_args"]
+
         cmd.append("-y")
         cmd.append(save_file)
 
+        print(str.join(" ", cmd))
         p = subprocess.Popen(cmd)
-        p.wait()
-        messagebox.showinfo("完了" ,f"抽出した音声を'{save_file}'に保存しました")
+        code = p.wait()
+
+        if code == 0:
+            messagebox.showinfo("完了" ,f"抽出した音声を'{save_file}'に保存しました")
+        else:
+            messagebox.showerror("失敗" ,f"'{save_file}'の保存に失敗しました")
+            try:
+                os.remove(save_file)
+            except:
+                pass
+        
+        self.master.lift()
     
     def play(self):
         # 再生ボタンをクリックした時の処理を実装する
         self.stop()
         start = self.start_slider.get()
         end = self.end_slider.get()
-        cmd = create_command(self.ffplay_path, self.path, start, end)
-        cmd.append("-vn")
-        cmd.append("-showmode")
-        cmd.append("0")
+        cmd = create_command(self.ffplay_path, self.path, start, end, ["-loop", "-1"])
+        if not self.show_preview_val.get():
+            cmd.append("-vn")
+            cmd.append("-showmode")
+            cmd.append("0")
         cmd.append("-autoexit")
         self.save_process = subprocess.Popen(cmd)
 

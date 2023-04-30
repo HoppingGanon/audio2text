@@ -2,13 +2,16 @@ import os
 import subprocess
 import time
 import tkinter as tk
+import tkinter.ttk as ttk
 from tkinter import messagebox
 from analyze import analyze, clear_cache
 import convert
 from open import open_json
-from common import create_command, get_ffplay_path, get_ffmpeg_path, get_ffprobe_path
+from common import create_command, get_ffplay_path, get_ffmpeg_path, get_ffprobe_path, load_settings
 from pathlib import Path
 import re
+from licenses import show as show_licenses
+import webbrowser
 
 class SearchForm(tk.Frame):
     def __init__(self, master=None):
@@ -23,6 +26,8 @@ class SearchForm(tk.Frame):
         if self.ffmpeg_path == "" or self.ffplay_path == "" or self.ffprobe_path == "":
             messagebox.showwarning("警告", "必要なファイルがありません。ffmpeg.exe, ffplay.exe, ffprobe.exeをこのスクリプトと同じディレクトリに配置するか、環境変数PATHを通してください。ffmpegは外部のサイトからダウンロードする必要があります。")
             return
+        
+        self.settings = load_settings()
 
         self.search_results = []
 
@@ -42,11 +47,16 @@ class SearchForm(tk.Frame):
         file_menu.add_command(label="プロジェクトの保存(未実装)")  # 解析データを開くコマンドを追加
         file_menu.add_command(label="プロジェクトの上書き(未実装)")  # 解析データを開くコマンドを追加
         menubar.add_cascade(label="ファイル", menu=file_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="使い方", command=self.go_how_to)
+        help_menu.add_command(label="このアプリについて", command=self.show_about) 
+        menubar.add_cascade(label="ヘルプ", menu=help_menu)
         self.master.config(menu=menubar)
 
         # チェックボックスの作成 ----------------------------
         self.check_frame = tk.Frame(self)
-        self.check_frame.pack(side=tk.TOP, padx=3, pady=10, anchor="w")
+        self.check_frame.pack(side=tk.TOP, padx=3, pady=3, anchor="w")
 
         self.disp_fname_val = tk.BooleanVar()
         self.disp_fname_val.set(True)
@@ -62,17 +72,37 @@ class SearchForm(tk.Frame):
         self.disp_kana.pack(side=tk.LEFT)
 
         # 検索フレームの作成 ----------------------------
-        self.search_frame = tk.Frame(self)
-        self.search_frame.pack(side=tk.TOP, padx=3, pady=5, anchor="w")
+        self.search_frame = tk.Frame(self, relief="solid")
+        self.search_frame.pack(side=tk.TOP, padx=3, pady=5, anchor="w", fill=tk.BOTH, expand=True)
         # ラベルの作成
         self.label = tk.Label(self.search_frame, text="Search:")
         self.label.pack(side=tk.LEFT)
         # エントリーの作成
-        self.entry = tk.Entry(self.search_frame, width=50)
-        self.entry.pack(side=tk.LEFT, padx=2)
+        self.entry = tk.Entry(self.search_frame)
+        self.entry.pack(side=tk.LEFT, padx=2, fill = tk.X, expand=True)
+        self.entry.bind("<Return>", self.search)
+
         # 検索ボタンの作成
         self.button = tk.Button(self.search_frame, text="検索", command=self.search)
-        self.button.pack(side=tk.LEFT)
+        self.button.pack(side=tk.RIGHT, padx=5)
+
+        # 検索結果のページ選択用フレームの作成 ----------------------------
+        self.page_frame = tk.Frame(self)
+        self.page_frame.pack(side=tk.TOP, padx=3, pady=10, anchor="ne")
+
+        # 1ページ当たりの表示数
+        self.per_page = 100
+        self.page = 0
+
+        # ページのコンボボックスを作成
+        self.page_selector = ttk.Combobox(self.page_frame, state="readonly", values=['設定なし'])
+        self.page_selector.pack(side=tk.RIGHT, padx=5)
+        self.page_selector.set("設定なし")
+
+        # データの定義 ----------------------------
+        self.project_path = ""
+        self.json_data = {}
+        self.json_data["data"] = []
 
         # キャンバスの作成 ----------------------------
         self.canvas = tk.Canvas(self, bg="white", height=300, width=450, scrollregion=(0, 0, 500, 600))
@@ -84,15 +114,45 @@ class SearchForm(tk.Frame):
         self.create_result_frame()
         self.canvas.pack(side="left", fill="both", expand=True)
 
-        self.project_path = ""
-        self.json_data = {}
-        self.json_data["data"] = []
-
+        # 検索結果の配列
         self.result_data = []
+        self.display_data = []
 
+        # 再生処理
         self.playing_process = None
 
         self.update_canvas(450)
+
+    def go_how_to(self):
+        webbrowser.open("https://github.com/HoppingGanon/audio2text")
+
+    def show_about(self):
+        show_licenses()
+
+    def update_page_selector(self):
+        self.page_selector.destroy()
+        pages = []
+
+        page_max = int((len(self.result_data) - 1) / self.per_page) + 1
+        for i in range(page_max):
+            from_ = i * self.per_page + 1
+            if i == page_max - 1:
+                to = len(self.result_data)
+            else:
+                to = (i + 1) * self.per_page
+            item = f"{str(from_)}～{str(to)}件目"
+            pages.append(item)
+        
+        self.page_selector = ttk.Combobox(self.page_frame, state="readonly", values=pages)
+        self.page_selector.set(pages[0])
+        self.page_selector.pack(side=tk.RIGHT, padx=5)
+        self.page_selector.bind("<<ComboboxSelected>>", self.change_page)
+
+    def change_page(self, *args):
+        self.stop(None)
+        self.page = self.page_selector.current()
+        self.create_result()
+        self.create_display()
     
     def create_result_frame(self):
         # キャンバスの作成
@@ -112,20 +172,24 @@ class SearchForm(tk.Frame):
             self.project_path = path
             self.json_data = obj
             self.set_all_result()
+            self.create_display()
             self.update_canvas()
+            self.update_page_selector()
 
     # 新規解析コマンドの関数
     def create_project(self):
         path = analyze()
-        print("解析が完了しました")
-        messagebox.showinfo("完了", "解析が完了しました")
         if path != "":
             path2, obj = open_json(path)
             if path2 != "":
                 self.project_path = path2
                 self.json_data = obj
                 self.set_all_result()
+                self.create_display()
                 self.update_canvas()
+                self.update_page_selector()
+                print("解析が完了しました")
+                messagebox.showinfo("完了", "解析が完了しました")
 
     def update_canvas(self, width = 0):
         if width == 0:
@@ -140,12 +204,13 @@ class SearchForm(tk.Frame):
             return
 
         # フレーム内にグリッドレイアウトを作成
-        for i, data in enumerate(self.result_data):
+        for i, data in enumerate(self.display_data):
             r = i*4
             self.result_frame.rowconfigure(r, weight=1)
             self.result_frame.columnconfigure(1, weight=1)
             actions_frame=tk.Frame(self.result_frame)
             actions_frame.grid(row=r, column=1, columnspan=2, pady=5, sticky="ew")
+            
             button = tk.Button(actions_frame, text="再生", name=f"play_button_{i}")
             button.bind("<ButtonPress>", self.play_all)
             button.pack(side=tk.LEFT, padx=2)
@@ -208,13 +273,26 @@ class SearchForm(tk.Frame):
             self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def set_all_result(self):
-        for data in self.json_data["data"]:
+        for index, data in enumerate(self.json_data["data"]):
             self.result_data.append(data)
 
-    def search(self):
+    def search(self, event = None):
         # 検索ボタンが押された時に呼ばれる関数
         self.stop(None)
+        self.create_result()
+        self.create_display()
+        self.update_page_selector()
 
+    def create_display(self):
+        self.display_data.clear()
+        for index, data in enumerate(self.result_data):
+            if self.page * self.per_page <= index < (self.page + 1) * self.per_page:
+                self.display_data.append(data)
+
+        self.update_idletasks()
+        self.update_canvas()
+
+    def create_result(self):
         prefix_count = 20
         suffix_count = 20
 
@@ -236,6 +314,8 @@ class SearchForm(tk.Frame):
                 path: str = data["path"]
 
                 loop = True
+
+                base_position = 0
                 while loop:
                     # textから検索
                     m = re.search(pattern, target)
@@ -267,17 +347,17 @@ class SearchForm(tk.Frame):
                         result["yomi"] = result_text
                     
                     result["is_text"] = is_text
-                    result["start"] = start
-                    result["end"] = end
+                    result["start"] = start + base_position
+                    result["end"] = end + base_position
                     result["json_index"] = json_index
                     self.result_data.append(result)
 
-        self.update_idletasks()
-        self.update_canvas()
+                    base_position += end + 1
+
 
     def play_all(self, event):
         index = int(event.widget._name[len("play_button_"):])
-        r_path = self.result_data[index]["path"]
+        r_path = self.display_data[index]["path"]
         d = str(Path(self.project_path).parent)
         fullpath = os.path.join(d, r_path)
         self.ffplay(fullpath)
@@ -293,30 +373,31 @@ class SearchForm(tk.Frame):
             return 0, data["duration"]
 
         cnt = 0
-        start_index = -1
+        start_index = 0
         for r in json_data["result"]:
             if is_text:
                 cnt += len(r["word"])
             else:
                 cnt += len(r["yomi"])
-            start_index += 1
-            if start <= cnt:
+            if start < cnt:
                 break
+            start_index += 1
+        
         cnt = 0
-        end_index = -1
+        end_index = 0
         for r in json_data["result"]:
             if is_text:
                 cnt += len(r["word"])
             else:
                 cnt += len(r["yomi"])
-            end_index += 1
             if end <= cnt:
                 break
+            end_index += 1
         
         # 有効な文字列の長さが0だった場合の処理
         if start_index == -1 or end_index == -1:
             return -1, -1
-
+        
         start_sec = json_data["result"][start_index]["start"]
         end_sec = json_data["result"][end_index]["end"]
 
@@ -324,7 +405,7 @@ class SearchForm(tk.Frame):
 
     def play_part(self, event):
         start_index = int(event.widget._name[len("play_part_button_"):])
-        data = self.result_data[start_index]
+        data = self.display_data[start_index]
         r_path = data["path"]
         d = str(Path(self.project_path).parent)
         fullpath = os.path.join(d, r_path)
@@ -341,7 +422,7 @@ class SearchForm(tk.Frame):
     def save(self, event):
         self.stop(None)
         start_index = int(event.widget._name[len("save_button_"):])
-        data = self.result_data[start_index]
+        data = self.display_data[start_index]
         r_path = data["path"]
         d = str(Path(self.project_path).parent)
         fullpath = os.path.join(d, r_path)
@@ -358,13 +439,33 @@ class SearchForm(tk.Frame):
             self.stop(None)
             time.sleep(0.15)
 
-        cmd = create_command(self.ffplay_path, path, start, end)
+        cmd = create_command(self.ffplay_path, path, start, end, ["-loop", "-1"])
         cmd.append("-vn")
         cmd.append("-showmode")
         cmd.append("0")
         cmd.append("-autoexit")
 
         self.playing_process = subprocess.Popen(cmd)
+    
+    def show_license_file(self):
+        # Tkinterウィンドウの作成
+        root = tk.Tk()
+        root.title('ライセンス')
+        root.geometry('400x300')
+
+        # テキストボックスの作成と配置
+        text_box = tk.Text(root, wrap=tk.WORD)
+        text_box.pack(fill=tk.BOTH, expand=True)
+
+        # "LICENSE"ファイルからライセンス情報を読み込む
+        with open('./LICENSE') as f:
+            license_text = f.read()
+
+        # テキストボックスにライセンス本文を表示
+        text_box.insert(tk.END, license_text)
+
+        # Tkinterウィンドウの実行
+        root.mainloop()
 
     def click_close(self):
         self.stop(None)
