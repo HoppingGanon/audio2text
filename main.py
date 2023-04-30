@@ -10,6 +10,7 @@ from open import open_json
 from common import create_command, get_ffplay_path, get_ffmpeg_path, get_ffprobe_path, load_settings
 from pathlib import Path
 import re
+from licenses import show as show_licenses
 
 class SearchForm(tk.Frame):
     def __init__(self, master=None):
@@ -45,6 +46,11 @@ class SearchForm(tk.Frame):
         file_menu.add_command(label="プロジェクトの保存(未実装)")  # 解析データを開くコマンドを追加
         file_menu.add_command(label="プロジェクトの上書き(未実装)")  # 解析データを開くコマンドを追加
         menubar.add_cascade(label="ファイル", menu=file_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="使い方")
+        help_menu.add_command(label="このアプリについて", command=self.show_about) 
+        menubar.add_cascade(label="ヘルプ", menu=help_menu)
         self.master.config(menu=menubar)
 
         # チェックボックスの作成 ----------------------------
@@ -115,6 +121,9 @@ class SearchForm(tk.Frame):
         self.playing_process = None
 
         self.update_canvas(450)
+
+    def show_about(self):
+        show_licenses()
 
     def update_page_selector(self):
         self.page_selector.destroy()
@@ -433,6 +442,26 @@ class SearchForm(tk.Frame):
         cmd.append("-autoexit")
 
         self.playing_process = subprocess.Popen(cmd)
+    
+    def show_license_file(self):
+        # Tkinterウィンドウの作成
+        root = tk.Tk()
+        root.title('ライセンス')
+        root.geometry('400x300')
+
+        # テキストボックスの作成と配置
+        text_box = tk.Text(root, wrap=tk.WORD)
+        text_box.pack(fill=tk.BOTH, expand=True)
+
+        # "LICENSE"ファイルからライセンス情報を読み込む
+        with open('./LICENSE') as f:
+            license_text = f.read()
+
+        # テキストボックスにライセンス本文を表示
+        text_box.insert(tk.END, license_text)
+
+        # Tkinterウィンドウの実行
+        root.mainloop()
 
     def click_close(self):
         self.stop(None)
